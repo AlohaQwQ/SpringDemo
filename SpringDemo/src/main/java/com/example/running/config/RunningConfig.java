@@ -3,8 +3,10 @@ package com.example.running.config;
 import com.example.running.bean.Cat;
 import com.example.running.bean.Dog;
 import com.example.running.bean.Zhouzhou;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -25,11 +27,13 @@ import org.yaml.snakeyaml.LoaderOptions;
  *          给容器中自动创建 LoaderOptions 类型的实例，ID 为全类名
  * 5.@ConditionalOnMissingBean 当容器中缺少 dog Bean注入时，本配置才生效
  * 6.@ImportResource 指示一个或多个包含要导入的 bean 定义的资源，可通过此注解导入spring 的配置文件
+ * 7.@EnableConfigurationProperties 开启某个Bean 的属性配置功能，并将该Bean 自动注册容器中。 适用于第三方包中的Bean，
  **/
 @Import(LoaderOptions.class)
 @Configuration(proxyBeanMethods = true)
-@ConditionalOnMissingBean(name = "dog")
-@ImportResource("classpath:beans.xml")
+@ConditionalOnMissingBean(name = "cat")
+//@ImportResource("classpath:beans.xml")
+@EnableConfigurationProperties(Dog.class)
 public class RunningConfig {
 
     /**
@@ -40,13 +44,14 @@ public class RunningConfig {
      * @ConditionalOnBean 当容器中有指定bean 组件时，本注入才生效
      **/
 //    @ConditionalOnBean(value = Cat.class)
-    @Bean("bendan")
+    @Bean
     public Zhouzhou zhouzhou(){
         Zhouzhou zhouzhou = new Zhouzhou();
         zhouzhou.setCat(cat());
         zhouzhou.setDog(dog());
+        System.out.println("zhouzhou-name:" + zhouzhou.getName());
         System.out.println("zhouzhou-cat:" + zhouzhou.getCat());
-        System.out.println("zhouzhou-dog:" + zhouzhou.getDog());
+       // System.out.println("zhouzhou-dog:" + zhouzhou.getDog() + "-name:" + zhouzhou.getDog().getName() + "-Autowired:"+ dog.getName());
         return zhouzhou;
     }
 

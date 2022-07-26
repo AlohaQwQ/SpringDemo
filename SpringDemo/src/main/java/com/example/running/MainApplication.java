@@ -11,13 +11,53 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.yaml.snakeyaml.LoaderOptions;
 
 /**
+ * Spring 的能力—
+ * 1.微服务(Microservices)
+ * 2.响应式开发
+ * 3.分布式开发(Spring Cloud)
+ * 4.Web开发(Spring MVC)
+ * 5.Serverless (无服务开发/函数式服务)
+ * 6.事件驱动，结合分布式系统
+ *
+ * 为什么用SpringBoot—
+ * 能快速创建出生产级别的Spring应用
+ *
+ * 1.Create stand-alone Spring applications
+ * 创建独立Spring应用
+ * 2.Embed Tomcat, Jetty or Undertow directly (no need to deploy WAR files)
+ * 内嵌web服务器
+ * 3.Provide opinionated ‘starter’ dependencies to simplify your build configuration
+ * 自动starter依赖，简化构建配置
+ * 4.Automatically configure Spring and 3rd party libraries whenever possible
+ * 自动配置Spring以及第三方功能
+ * 5.Provide production-ready features such as metrics, health checks, and externalized configuration
+ * 提供生产级别的监控、健康检查及外部化配置
+ * 6.Absolutely no code generation and no requirement for XML configuration
+ * 无代码生成、无需编写XML
+ * 7.SpringBoot是整合Spring技术栈的一站式框架
+ * 8.SpringBoot是简化Spring技术栈的快速开发脚手架
+ *
+ */
+/**
+ * 引导加载自动配置类
+ * @SpringBootApplication
+ *    ——@SpringBootConfiguration 配置类
+ *      @ComponentScan(excludeFilters = { @Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
+ *                @Filter(type = FilterType.CUSTOM, classes = AutoConfigurationExcludeFilter.class) })  包扫描注解，自定义扫描器
+ *      @EnableAutoConfiguration 开启自动配置
+ *       ——@AutoConfigurationPackage 自动配置包
+ *          ——@Import(AutoConfigurationPackages.Registrar.class) Registrar给容器中 某个包下的组件批量注册（MainApplication）
+ *         @Import(AutoConfigurationImportSelector.class)
+ */
+
+/**
  * @author Aloha
  * @date 2022/7/24 17:11
  * @description 这是一个SpringBoot主程序入口类
  */
 //scanBasePackages-修改包扫描路径
 @SpringBootApplication()
-@SpringBootConfiguration(proxyBeanMethods = false)
+//@SpringBootConfiguration(proxyBeanMethods = false)
 public class MainApplication {
 
     public static void main(String[] args) {
@@ -64,15 +104,15 @@ public class MainApplication {
         boolean dog = context.containsBean("dog");
         System.out.println("dog:" + dog);
 
-        boolean bendan = context.containsBean("bendan");
+        boolean bendan = context.containsBean("xiaozhu");
 //        Zhouzhou zhouzhou = context.getBean(Zhouzhou.class);
         System.out.println("zhouzhou:" + bendan);
 
         //7.通过 @ImportResource 的方式导入组件
-        Cat cat22 = (Cat) context.getBean("cat22");
-        Dog dog22 = (Dog) context.getBean("dog22");
-        System.out.println("cat22:" + cat22);
-        System.out.println("dog22:" + dog22);
+//        Cat cat22 = (Cat) context.getBean("cat22");
+//        Dog dog22 = (Dog) context.getBean("dog22");
+//        System.out.println("cat22:" + cat22);
+//        System.out.println("dog22:" + dog22);
 
 
 

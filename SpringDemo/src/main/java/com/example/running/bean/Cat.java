@@ -1,5 +1,8 @@
 package com.example.running.bean;
 
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
 public class Cat {
 
     private String eatFood;

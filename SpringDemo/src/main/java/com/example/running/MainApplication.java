@@ -8,6 +8,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Conditional;
 import org.yaml.snakeyaml.LoaderOptions;
 
 /**
@@ -48,6 +49,16 @@ import org.yaml.snakeyaml.LoaderOptions;
  *       ——@AutoConfigurationPackage 自动配置包
  *          ——@Import(AutoConfigurationPackages.Registrar.class) Registrar给容器中 某个包下的组件批量注册（MainApplication）
  *         @Import(AutoConfigurationImportSelector.class)
+ *          1、利用getAutoConfigurationEntry(annotationMetadata);给容器中批量导入一些组件
+ *          2、调用List<String> configurations = AutoConfigurationImportSelector.getCandidateConfigurations(annotationMetadata, attributes)获取到所有需要导入到容器中的配置类
+ *          3、利用工厂加载 Map<String, List<String>> SpringFactoriesLoader.loadSpringFactories(@Nullable ClassLoader classLoader)；得到所有的组件
+ *          4、从META-INF/spring.factories位置来加载一个文件。
+ *         	默认扫描我们当前系统里面所有META-INF/spring.factories位置的文件
+ *          spring-boot-autoconfigure-2.3.4.RELEASE.jar包里面也有META-INF/spring.factories
+ *          文件里面配置了spring-boot一启动就要给容器中加载的所有配置类
+ *          xxxxAutoConfiguration(BatchAutoConfiguration、CacheAutoConfiguration)  按照条件装配规则@Conditional，最终会按需配置。
+ *          (@ConditionalOnClass(LocalContainerEntityManagerFactoryBean.class，@ConditionalOnBean(AbstractEntityManagerFactoryBean.class)
+ *
  */
 
 /**

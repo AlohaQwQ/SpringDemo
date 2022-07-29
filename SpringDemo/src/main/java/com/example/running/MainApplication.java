@@ -39,6 +39,7 @@ import org.yaml.snakeyaml.LoaderOptions;
  * 8.SpringBoot是简化Spring技术栈的快速开发脚手架
  *
  */
+
 /**
  * 引导加载自动配置类
  * @SpringBootApplication
@@ -59,6 +60,49 @@ import org.yaml.snakeyaml.LoaderOptions;
  *          xxxxAutoConfiguration(BatchAutoConfiguration、CacheAutoConfiguration)  按照条件装配规则@Conditional，最终会按需配置。
  *          (@ConditionalOnClass(LocalContainerEntityManagerFactoryBean.class，@ConditionalOnBean(AbstractEntityManagerFactoryBean.class)
  *
+ *          Web-Servlet 自动配置类，Spring-MVC 相关配置
+ *          @ConditionalOnClass(DispatcherServlet.class)
+ *          public class DispatcherServletAutoConfiguration {
+ *              容器中是否有该组件(tomcat包中已包含)
+ *              @ConditionalOnClass(ServletRegistrion.class)
+ * 	            @EnableConfigurationProperties(WebMvcPropeies.class)
+ * 	            protected static class DispatcherServletConfiguration {
+ *
+ *                      @Bean
+ * 	             		@ConditionalOnBean(Multipartolver.class)
+ * 	             		@ConditionalOnMissingBean(name = DispatcherServlet.MULTIPART_RESOLVER_BEAN_NAME) 如果用户没有配置该组件，则将该bean 注册到容器中
+ *  	            	public MultipartResolver multipartResolver(MultipartResolver resolver) {
+ *  	            		// Detect if the user has created a MultipartResolver but named it incorrectly
+ * 	             			return resolver;
+ *  	            	}
+ * 	            }
+ *          }
+ *          配置属性前缀为 spring.mvc
+ *          @ConfigurationProperties(prefix = "spring.mvc")
+ *          public class WebMvcProperties {}
+ *
+ *          条件装配——SpringBoot 默认组件
+ *          @Bean
+ * 	        @ConditionalOnMisngBean
+ * 	        public CharacterEncodingFilter characterEncodingFilter() {}
+ *
+ *	        @Bean
+ *	        @Lazy
+ *	        @ConditionalOnMisngBean
+ *	        public RestTemplateBuilder restTemplateBuilder(RestTemplateBuilderConfigurer restTemplateBuilderConfigurer) {}
+ *
+ */
+
+/**
+ * 总结：
+ * ● SpringBoot先加载所有的自动配置类  xxxxxAutoConfiguration
+ * ● 每个自动配置类按照条件进行生效，默认都会绑定配置文件指定的值。xxxxProperties里面拿。xxxProperties和配置文件进行了绑定
+ * ● 生效的配置类就会给容器中装配很多组件
+ * ● 只要容器中有这些组件，相当于这些功能就有了
+ * ● 定制化配置
+ *   ○ 用户直接自己@Bean替换底层的组件
+ *   ○ 用户去看这个组件是获取的配置文件什么值就去修改。
+ * xxxxxAutoConfiguration ---> 组件  ---> xxxxProperties里面拿值  ----> application.properties 修改对应属性
  */
 
 /**

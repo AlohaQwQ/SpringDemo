@@ -1,0 +1,39 @@
+# application.properties 中的配置会优先于 application.yml 被读取
+server:
+  port: 7080
+spring:
+  banner:
+    image:
+      location: classpath:banner1.png
+    location:
+
+
+# yaml表示以上对象
+#person:
+#  userName: "zhangsan \n 李四"
+#  单引号会将 \n 作为字符串输出， 双引号为将\n 作为换行输出
+#  双引号不会转义，单引号会转义
+#  boss: false
+#  birth: 2019/12/12 20:12:33
+#  age: 18
+#  pet:
+#    name: tomcat
+#    weight: 23.4
+#  interests: [篮球,游泳] -数组/List表现形式1
+#  animal: -数组/List表现形式2
+#    - jerry
+#    - mario
+#  score: -Map 表现形式1
+#    english:
+#      first: 30
+#      second: 40
+#      third: 50
+#    math: [131,140,148]
+#    chinese: {first: 128,second: 136} -Map 表现形式2
+#  salarys: [3999,4999.98,5999.99]
+#  allPets: - Map<String, List<Pet>> 表现形式
+#    sick:
+#      - {name: tom,weight: 47}
+#      - name: jerry
+#        weight: 57
+#    health: [{name: mario,weight: 47}, {name: mario,weight: 57}]

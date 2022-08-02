@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
  * @since 2022/7/26 17:40
  * 配置属性，指定别名为 prefix 自动注入配置好的属性
  **/
-//@Component
-//@ConfigurationProperties(prefix = "xiaozhu")
+@Component
+@ConfigurationProperties(prefix = "xiaozhu")
 public class Zhouzhou {
 
     private String name;

@@ -95,6 +95,7 @@ import org.yaml.snakeyaml.LoaderOptions;
 
 /**
  * 总结：
+ * https://spring.io/projects/spring-boot
  * ● SpringBoot先加载所有的自动配置类  xxxxxAutoConfiguration
  * ● 每个自动配置类按照条件进行生效，默认都会绑定配置文件指定的值。xxxxProperties里面拿。xxxProperties和配置文件进行了绑定
  * ● 生效的配置类就会给容器中装配很多组件

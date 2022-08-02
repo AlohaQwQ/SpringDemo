@@ -2,6 +2,8 @@ package com.example.running.controller;
 
 import com.example.running.bean.Dog;
 import com.example.running.bean.Zhouzhou;
+import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.batch.core.launch.support.SimpleJobLauncher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -22,9 +24,14 @@ public class RunningController {
     @Autowired
     private Dog dog;
 
+    @Resource
+    public JobLauncher jobLauncher;
+
     @RequestMapping("/hello")
     public String hello(@RequestParam String hello){
         zhouzhou.getCat();
+        String name = zhouzhou.getName();
+
         return "hello:" + hello;
     }
 
@@ -32,4 +39,6 @@ public class RunningController {
     public Dog dog(){
        return dog;
     }
+
+
 }

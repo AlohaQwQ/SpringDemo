@@ -111,6 +111,44 @@ import org.yaml.snakeyaml.LoaderOptions;
  * @date 2022/7/24 17:11
  * @description 这是一个SpringBoot主程序入口类
  */
+
+/**
+ * @author Aloha
+ * 1、SpringMVC自动配置概览
+ * Spring Boot provides auto-configuration for Spring MVC that works well with most applications.(大多场景我们都无需自定义配置)
+ * The auto-configuration adds the following features on top of Spring’s defaults: (自动配置在 Spring 的默认值之上添加了以下特性：)
+ *
+ * ● Inclusion of ContentNegotiatingViewResolver and BeanNameViewResolver beans.
+ *   ○ 内容协商视图解析器和BeanName视图解析器
+ * ● Support for serving static resources, including support for WebJars (covered later in this document)).
+ *   ○ 静态资源（包括webjars）
+ * ● Automatic registration of Converter, GenericConverter, and Formatter beans.
+ *   ○ 自动注册 Converter，GenericConverter，Formatter
+ * ● Support for HttpMessageConverters (covered later in this document).
+ *   ○ 支持 HttpMessageConverters （后来我们配合内容协商理解原理）
+ * ● Automatic registration of MessageCodesResolver (covered later in this document).
+ *   ○ 自动注册 MessageCodesResolver （国际化用）
+ * ● Static index.html support.
+ *   ○ 静态index.html 页支持
+ * ● Custom Favicon support (covered later in this document).
+ *   ○ 自定义 Favicon
+ * ● Automatic use of a ConfigurableWebBindingInitializer bean (covered later in this document).
+ *   ○ 自动使用 ConfigurableWebBindingInitializer ，（DataBinder负责将请求数据绑定到JavaBean上）
+ *
+ * If you want to keep those Spring Boot MVC customizations and make more MVC customizations (interceptors, formatters,
+ * view controllers, and other features), you can add your own @Configuration class of type WebMvcConfigurer but without @EnableWebMvc.
+ * 不用@EnableWebMvc注解。使用 @Configuration + WebMvcConfigurer 自定义规则
+ *
+ * If you want to provide custom instances of RequestMappingHandlerMapping, RequestMappingHandlerAdapter, or ExceptionHandlerExceptionResolver,
+ * and still keep the Spring Boot MVC customizations, you can declare a bean of type WebMvcRegistrations and use it to provide custom instances of those components.
+ * 声明 WebMvcRegistrations 改变默认底层组件
+ *
+ * If you want to take complete control of Spring MVC, you can add your own @Configuration annotated with @EnableWebMvc,
+ * or alternatively add your own @Configuration-annotated DelegatingWebMvcConfiguration as described in the Javadoc of @EnableWebMvc.
+ * 使用 @EnableWebMvc+@Configuration+DelegatingWebMvcConfiguration 全面接管SpringMVC
+ *
+ */
+
 //scanBasePackages-修改包扫描路径
 @SpringBootApplication()
 //@SpringBootConfiguration(proxyBeanMethods = false)

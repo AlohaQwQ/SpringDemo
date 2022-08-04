@@ -44,7 +44,7 @@ public class RunningConfig {
      * @ConditionalOnBean 当容器中有指定bean 组件时，本注入才生效
      **/
 //    @ConditionalOnBean(value = Cat.class)
-    @Bean
+//    @Bean
     public Zhouzhou zhouzhou(){
         Zhouzhou zhouzhou = new Zhouzhou();
         zhouzhou.setCat(cat());

@@ -6,7 +6,8 @@ spring:
     image:
       location: classpath:banner1.png
     location:
-
+  mvc:
+    static-path-pattern: /resources/**
 
 # yaml表示以上对象
 #person:

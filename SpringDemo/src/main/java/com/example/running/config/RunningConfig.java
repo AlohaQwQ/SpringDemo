@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.ImportResource;
+import org.springframework.web.filter.HiddenHttpMethodFilter;
 import org.yaml.snakeyaml.LoaderOptions;
 
 /**
@@ -64,5 +65,13 @@ public class RunningConfig {
 //    @Bean
     public Dog dog(){
         return new Dog();
+    }
+
+    //自定义HiddenHttpMethodFilter 隐藏Http方法过滤器，自定义方法前缀(_method)
+    @Bean
+    public HiddenHttpMethodFilter hiddenHttpMethodFilter(){
+        HiddenHttpMethodFilter methodFilter = new HiddenHttpMethodFilter();
+        methodFilter.setMethodParam("_m");
+        return methodFilter;
     }
 }

@@ -2,14 +2,24 @@
 server:
   port: 7080
 spring:
+  mvc:
+    static-path-pattern: /**
+    hiddenmethod:
+      filter:
+        enabled: false #是否开启页面表单的Rest功能
   banner:
     image:
       location: classpath:banner1.png
-    location:
-  mvc:
-    static-path-pattern: /resources/**
+  #禁用所有静态资源规则
+#  web:
+#    resources:
+#      add-mappings: false
+#    location:
+#  mvc:
+#    static-path-pattern: /resources/**
 
-# yaml表示以上对象
+
+# yaml表示Bean对象
 #person:
 #  userName: "zhangsan \n 李四"
 #  单引号会将 \n 作为字符串输出， 双引号为将\n 作为换行输出

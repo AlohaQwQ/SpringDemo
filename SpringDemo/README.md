@@ -188,3 +188,69 @@ public class HiddenHttpMethodFilter extends OncePerRequestFilter {
 Rest使用客户端工具，
 
 * 如PostMan直接发送Put、delete等方式请求，无需Filter。
+
+### 3.请求映射原理(DispatcherServlet)
+
+DispatcherServlet 类继承关系
+
+`HttpServlet->HttpServletBean->FrameworkServlet->DispatcherServlet`
+
+> Http请求方法分发逻辑
+
+`HttpServlet.doGet()->FrameworkServlet.doGet()->FrameworkServlet.processRequest()->DispatcherServlet.doService()->DispatcherServlet.doDispatch()`
+
+```java
+protected void doDispatch(HttpServletRequest request, HttpServletResponse response) throws Exception{
+  HttpServletRequest processedRequest=request;
+  HandlerExecutionChain mappedHandler=null;
+  boolean multipartRequestParsed=false;
+
+  WebAsyncManager asyncManager=WebAsyncUtils.getAsyncManager(request);
+  //检测是否是文件请求
+  processedRequest = checkMultipart(request);
+  multipartRequestParsed = (processedRequest != request);
+
+  // Determine handler for the current request. 决定当前请求由哪个handler(Controller) 处理
+  mappedHandler = getHandler(processedRequest);
+  // HandlerMapping 处理器映射
+  if (mappedHandler == null) {
+     noHandlerFound(processedRequest, response);
+     return;
+  }
+  
+}
+```
+
+> 分发请求路径地址映射匹配逻辑
+
+`DispatcherServlet.doDispatch()->DispatcherServlet.getHandler()-> HandlerMapping.getHandler()->HandlerMapping.getHandlerInternal()->HandlerMapping.lookupHandlerMethod()->MappingRegistry.getMappingsByDirectPath()->MappingRegistry.addMatchingMappings()`
+
+```java
+protected HandlerExecutionChain getHandler(HttpServletRequest request) throws Exception {
+    if (this.handlerMappings != null) {
+        for (HandlerMapping mapping : this.handlerMappings) {
+            HandlerExecutionChain handler = mapping.getHandler(request);
+            if (handler != null) {
+                return handler;
+            }
+        }
+    }
+    return null;
+}
+```
+
+![image.png](./assets/1660013633943-image.png)
+
+HandlerMappings(List)-所有的请求映射都存放在此
+
+* RequestMappingHandlerMapping -保存了所有@RequestMapping 和handler(Controller)的映射规则(MappingRegistry-映射注册中心)
+* WelcomePageHandlerMapping -SpringBoot自动配置欢迎页, 访问 /能访问到index.html
+* BeanNameUrlHandlerMapping
+* RouterFunctionMapping
+* SimpleUrlHandlerMapping
+
+1. SpringBoot自动配置了默认的 RequestMappingHandlerMapping
+2. 请求进来，挨个尝试所有的HandlerMapping看是否有请求信息
+   * 如果有就找到这个请求对应的handler
+   * 如果没有就是下一个 HandlerMapping
+3. 我们需要一些自定义的映射处理，我们也可以自己给容器中自定义HandlerMapping

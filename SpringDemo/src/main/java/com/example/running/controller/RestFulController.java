@@ -12,25 +12,21 @@ public class RestFulController {
 
     @GetMapping("/user")
     public String getUser(){
-
-        return "";
+        return "get";
     }
 
     @PostMapping("/user")
     public String postUser(){
-
-        return "";
+        return "post";
     }
 
     @PutMapping("/user")
     public String putUser(){
-
-        return "";
+        return "put";
     }
 
     @DeleteMapping("/user")
     public String deleteUser(){
-
-        return "";
+        return "delete";
     }
 }

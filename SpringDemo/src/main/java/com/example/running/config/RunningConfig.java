@@ -58,7 +58,7 @@ public class RunningConfig {
 
     @Bean
     public Cat cat(){
-        return new Cat();
+        return new Cat("food", "miao");
     }
 
 
@@ -70,6 +70,9 @@ public class RunningConfig {
     //自定义HiddenHttpMethodFilter 隐藏Http方法过滤器，自定义方法前缀(_method)
     @Bean
     public HiddenHttpMethodFilter hiddenHttpMethodFilter(){
+        //获取springboot 容器中HiddenHttpMethodFilter 实体类
+        //HiddenHttpMethodFilter hiddenHttpMethodFilter = context.getBean(HiddenHttpMethodFilter.class);
+        //hiddenHttpMethodFilter.setMethodParam("qq");
         HiddenHttpMethodFilter methodFilter = new HiddenHttpMethodFilter();
         methodFilter.setMethodParam("_m");
         return methodFilter;

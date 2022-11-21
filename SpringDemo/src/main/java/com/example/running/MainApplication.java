@@ -1,15 +1,20 @@
 package com.example.running;
 
+import com.example.running.annotations.TestAnnotations;
 import com.example.running.bean.Cat;
 import com.example.running.bean.Dog;
 import com.example.running.bean.Zhouzhou;
 import com.example.running.config.RunningConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.SpringBootConfiguration;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Conditional;
+import org.springframework.web.filter.HiddenHttpMethodFilter;
 import org.yaml.snakeyaml.LoaderOptions;
+
+import java.lang.reflect.Field;
 
 /**
  * Spring 的能力—
@@ -57,9 +62,10 @@ import org.yaml.snakeyaml.LoaderOptions;
  *         	默认扫描我们当前系统里面所有META-INF/spring.factories位置的文件
  *          spring-boot-autoconfigure-2.3.4.RELEASE.jar包里面也有META-INF/spring.factories
  *          文件里面配置了spring-boot一启动就要给容器中加载的所有配置类
- *          xxxxAutoConfiguration(BatchAutoConfiguration、CacheAutoConfiguration)  按照条件装配规则@Conditional，最终会按需配置。
+ *          xxxxAutoConfiguration(BatchAutoConfiguration、CacheAutoConfiguration)  但是最终会按照条件装配规则@Conditional，最终会按需配置。
  *          (@ConditionalOnClass(LocalContainerEntityManagerFactoryBean.class，@ConditionalOnBean(AbstractEntityManagerFactoryBean.class)
  *
+ *          org.springframework.boot.autoconfigure.web.servlet.DispatcherServletAutoConfiguration
  *          Web-Servlet 自动配置类，Spring-MVC 相关配置
  *          @ConditionalOnClass(DispatcherServlet.class)
  *          public class DispatcherServletAutoConfiguration {
@@ -80,16 +86,6 @@ import org.yaml.snakeyaml.LoaderOptions;
  *          配置属性前缀为 spring.mvc
  *          @ConfigurationProperties(prefix = "spring.mvc")
  *          public class WebMvcProperties {}
- *
- *          条件装配——SpringBoot 默认组件
- *          @Bean
- * 	        @ConditionalOnMisngBean
- * 	        public CharacterEncodingFilter characterEncodingFilter() {}
- *
- *	        @Bean
- *	        @Lazy
- *	        @ConditionalOnMisngBean
- *	        public RestTemplateBuilder restTemplateBuilder(RestTemplateBuilderConfigurer restTemplateBuilderConfigurer) {}
  *
  */
 
@@ -170,9 +166,34 @@ public class MainApplication {
 
         //3.从容器中获取组件
 //        Zhouzhou zhouzhou = context.getBean(Zhouzhou.class);
-////        Zhouzhou bendan = (Zhouzhou) context.getBean("bendan");
-//        Zhouzhou zhouzhou = config.zhouzhou();
-//        Zhouzhou bendan = config.zhouzhou();
+//        Zhouzhou bendan = (Zhouzhou) context.getBean("bendan");
+        Zhouzhou zhouzhou = config.zhouzhou();
+
+        //获取Person class 实例
+        Class<Cat> catClass = Cat.class;
+
+        //反射获取 类上的注解
+        TestAnnotations classAnnotation = catClass.getAnnotation(TestAnnotations.class);
+        System.out.println("annotions:" + classAnnotation.age());
+        System.out.println("annotions:" + classAnnotation.name());
+
+        //反射获取 private属性上的注解
+
+        try {
+//            Field age = catClass.getDeclaredField("age");
+            Field name = catClass.getDeclaredField("name");
+//            System.out.println("annotions-age:" + classAnnotation.age());
+            System.out.println("annotions-name:" + name.getAnnotation(TestAnnotations.class));
+
+        } catch (NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
+
+
+        //获取springboot 容器中HiddenHttpMethodFilter 实体类
+        //HiddenHttpMethodFilter hiddenHttpMethodFilter1 = context.getBean(HiddenHttpMethodFilter.class);
+        //修改_method 的值
+        //hiddenHttpMethodFilter1.setMethodParam("qq");
 //
 //        //4.Config 配置为代理类，则容器中对象为单实例，每次获取都是唯一
 //        System.out.println("bean:" + zhouzhou);

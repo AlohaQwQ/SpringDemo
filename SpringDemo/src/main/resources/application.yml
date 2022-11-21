@@ -3,14 +3,13 @@ server:
   port: 7080
 spring:
   mvc:
-    static-path-pattern: /**
-    hiddenmethod:
+    hidden-method:
       filter:
         enabled: false #是否开启页面表单的Rest功能
   banner:
     image:
       location: classpath:banner1.png
-  #禁用所有静态资源规则
+#禁用所有静态资源规则
 #  web:
 #    resources:
 #      add-mappings: false

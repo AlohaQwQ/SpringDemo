@@ -3,11 +3,14 @@ package com.example.running.controller;
 import com.example.running.bean.Dog;
 import com.example.running.bean.Zhouzhou;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.HttpServletBean;
 
 import javax.annotation.Resource;
+import javax.servlet.ServletRequestWrapper;
 
 /**
  * @author Aloha
@@ -27,7 +30,6 @@ public class RunningController {
     public String hello(@RequestParam String hello){
         zhouzhou.getCat();
         String name = zhouzhou.getName();
-
         return "hello:" + hello;
     }
 

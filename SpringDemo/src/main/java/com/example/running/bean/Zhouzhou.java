@@ -41,4 +41,13 @@ public class Zhouzhou {
     public void setDog(Dog dog) {
         this.dog = dog;
     }
+
+    @Override
+    public String toString() {
+        return "Zhouzhou{" +
+                "name='" + name + '\'' +
+                ", cat=" + cat +
+                ", dog=" + dog +
+                '}';
+    }
 }

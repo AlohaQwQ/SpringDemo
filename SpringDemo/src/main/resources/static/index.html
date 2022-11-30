@@ -3,6 +3,7 @@
     <title>Index</title>
     <p>Hello</p>
     <img scr = "res.jpg"/>
+    <hr>
     <form action="/user" method="get">
         <input value="REST-GET提交" type="submit" />
     </form>
@@ -19,8 +20,50 @@
     <form action="/user" method="post">
         <input name="_m" type="hidden" value="PUT" />
         <input value="REST-PUT提交"type="submit" />
-    <form>
+    </form>
+    <hr/>
+    测试基本注解
+    <ul>
+        <a href="/getCar/3/owner/diudiu?id=3&ints=1&ints=2">car</a>
+        <li>@Pathvariable（路径变量）</li>
+        <li>@RequestHeader（获取请求头）</li>
+        <li>@RequestParam（获取请求参数）</li>
+        <li>@cookievalue（获取cookie值</li>
+        <li>@RequestAttribute（获取request域属性）</li>
+        <li>@RequestBody（获取请求体）</li>
+        <li>@Matrixvariable（矩阵变量）</li>
+    </ul>
 
+    <a href="/matrixCar/sell;low=34;brand=byd,audi,yd">@MatrixVariable（矩阵变量）</a>
+    <a href="/matrixCar/sell;low=34;brand=byd;brand=audi;brand=yd">[@MatrixVariable(矩阵变量)</a>
+    <a href="/boss/1;age=20/2;age=10">@MatrixVariable（矩阵变量）/boss/{bossTd}/{empId}</a>
+    <br/>
+    <form action="/postCar/3/owner/diudiu" method="post">
+        测试@RequestBody获取数据<br/>
+        用户名: <input name="userName" value="666"/><br>
+        邮箱:<input name="email" value="qq@com"/>
+        <input type="submit" value="提交"/>
+    </form>
 
+    <ol>
+        <li>矩阵变量需要在springBoot中手动开启</li>
+        <li>根据RFC3986的规范，矩阵变量应当绑定在路径变量中</li>
+        <li>若是有多个矩阵变量，应当使用英文符号;进行分隔。</li>
+        <li>若是一个矩阵变量有多个值，应当使用英文符号,进行分隔，或之命名多个重复的key即可。</li>
+        <li>如: /cars/sell;low=34;brand=byd,audi,yd</li>
+    </ol>
+
+    <hr/>
+    测试原生API:<a href="/testapi">测试原生API</a><hr/>
+    测试复杂类型:<hr/>
+    测试封装POJO:
+    <form action="/saveuser" method="post">
+        姓名:<input name="userName" value="zhangsan"/><br/>
+        年龄:<input name="age" value="18"/><br/>
+        生日:<input name="birth" value="2022/12/10"/><br/>
+        宠物姓名: <input name="pet.name" value="阿猫"/><br/>
+        宠物年龄: <input name="pet.age" value="5"/>
+        <input type="submit" value="保存"/>
+    </form>
 </body>
 </html>

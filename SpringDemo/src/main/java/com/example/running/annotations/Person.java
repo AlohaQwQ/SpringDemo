@@ -8,9 +8,12 @@ public class Person {
     @TestAnnotations(age = 30,name = "ag")
     String name;
 
-    public Person(int age, String name) {
+    String weight;
+
+    public Person(int age, String name, String weight) {
         this.age = age;
         this.name = name;
+        this.weight = weight;
     }
 
     public int getAge() {
@@ -27,5 +30,22 @@ public class Person {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getWeight() {
+        return weight;
+    }
+
+    public void setWeight(String weight) {
+        this.weight = weight;
+    }
+
+    @Override
+    public String toString() {
+        return "Person{" +
+                "age=" + age +
+                ", name='" + name + '\'' +
+                ", weight='" + weight + '\'' +
+                '}';
     }
 }

@@ -12,6 +12,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.ImportResource;
 import org.springframework.web.filter.HiddenHttpMethodFilter;
+import org.springframework.web.servlet.DispatcherServlet;
+import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.util.UrlPathHelper;
 import org.yaml.snakeyaml.LoaderOptions;
 
 /**
@@ -77,4 +81,19 @@ public class RunningConfig {
         methodFilter.setMethodParam("_m");
         return methodFilter;
     }
+
+    @Bean
+    public WebMvcConfigurer webMvcConfigurer(){
+        WebMvcConfigurer webMvcConfigurer = new WebMvcConfigurer() {
+            @Override
+            public void configurePathMatch(PathMatchConfigurer configurer) {
+                UrlPathHelper urlPathHelper = new UrlPathHelper();
+                //设置不移除 ;后面的内容，使矩阵变量注解可用
+                urlPathHelper.setAlwaysUseFullPath(false);
+                configurer.setUrlPathHelper(urlPathHelper);
+            }
+        };
+        return webMvcConfigurer;
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.example.running.config;
 
+import com.example.running.annotations.Pet;
 import com.example.running.bean.Cat;
 import com.example.running.bean.Dog;
 import com.example.running.bean.Zhouzhou;
@@ -11,6 +12,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.ImportResource;
+import org.springframework.core.convert.converter.ConditionalConverter;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.format.Formatter;
+import org.springframework.format.FormatterRegistry;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.HiddenHttpMethodFilter;
 import org.springframework.web.servlet.DispatcherServlet;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
@@ -91,6 +97,70 @@ public class RunningConfig {
                 //设置不移除 ;后面的内容，使矩阵变量注解可用
                 urlPathHelper.setAlwaysUseFullPath(false);
                 configurer.setUrlPathHelper(urlPathHelper);
+            }
+
+            /**
+             * Add {@link Converter Converters} and {@link Formatter Formatters} in addition to the ones
+             * registered by default.
+             * 在默认注册的基础上增加{@link Converter Converter}和{@link Formatter Formatters}。
+             */
+            @Override
+            public void addFormatters(FormatterRegistry registry) {
+                //增加自定义参数类型转换器
+                registry.addConverter(new Converter<String, Pet>() {
+
+                    /**
+                     * A converter converts a source object of type {@code S} to a target of type {@code T}.
+                     * <p>Implementations of this interface are thread-safe and can be shared.
+                     * <p>Implementations may additionally implement {@link ConditionalConverter}.
+                     * 转换器将类型为{@code S}的源对象转换为类型为{@code T}的目标。该接口的实现是线程安全的，可以共享。<p>实现可以额外实现{@link ConditionalConverter}。
+                     * @author Keith Donald
+                     * @author Josh Cummings
+                     * @since 3.0
+                     * @param <S> the source type
+                     * @param <T> the target type
+                     */
+
+
+                    /**
+                     * Convert the source object of type {@code S} to target type {@code T}.
+                     * @param source the source object to convert, which must be an instance of {@code S} (never {@code null})
+                     * @return the converted object, which must be an instance of {@code T} (potentially {@code null})
+                     * @throws IllegalArgumentException if the source cannot be converted to the desired target type
+                     * 将类型{@code S}的源对象转换为目标类型{@code T}。
+                     */
+                    @Override
+                    public Pet convert(String source) {
+                        //喵喵，3
+                        if(StringUtils.hasLength(source)){
+                            String[] split = source.split(",");
+                            Pet pet = new Pet();
+                            pet.setName(split[0]);
+                            pet.setAge(split[1]);
+                            return pet;
+                        }
+                        return null;
+                    }
+
+                    /**
+                     * Construct a composed {@link Converter} that first applies this {@link Converter}
+                     * to its input, and then applies the {@code after} {@link Converter} to the
+                     * result.
+                     * 构造一个组合的{@link Converter}，首先将这个{@link Converter}应用于它的输入，然后将}{@link Converter}之后的{@code应用于结果。
+                     *
+                     * @param after the {@link Converter} to apply after this {@link Converter}
+                     * is applied
+                     * @param <U> the type of output of both the {@code after} {@link Converter}
+                     * and the composed {@link Converter}
+                     * @return a composed {@link Converter} that first applies this {@link Converter}
+                     * and then applies the {@code after} {@link Converter}
+                     * @since 5.3
+                     */
+                    @Override
+                    public <U> Converter<String, U> andThen(Converter<? super Pet, ? extends U> after) {
+                        return Converter.super.andThen(after);
+                    }
+                });
             }
         };
         return webMvcConfigurer;

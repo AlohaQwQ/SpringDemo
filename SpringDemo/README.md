@@ -692,6 +692,8 @@ protected HandlerMethod lookupHandlerMethod(String lookupPath, HttpServletReques
 ```
 
 ![img.png](assets/img.png)
+<details>
+  <summary>WebMvcConfigurationSupport</summary>
 
 ```java
 //SpringBoot 容器中自动创建的RequestMappingHandlerMapping，用于解析所有 @RequestMapping 注解的方法
@@ -719,7 +721,7 @@ public class WebMvcConfigurationSupport implements ApplicationContextAware, Serv
     ...
 }
 ```
-
+</details>
 HandlerMappings(List)-所有的请求映射都存放在此
 
 * RequestMappingHandlerMapping -保存了所有@RequestMapping 和handler(Controller)的映射规则(MappingRegistry-映射注册中心)
@@ -754,6 +756,9 @@ HandlerMappings(List)-所有的请求映射都存放在此
   * 若是有多个矩阵变量，应当使用英文符号;进行分隔
   * 若是一个矩阵变量有多个值，应当使用英文符号,进行分隔，或之命名多个重复的key即可
 * @ModelAttribute
+
+<details>
+  <summary>代码示例</summary>
 
 ```java
     @RequestMapping("/hello")
@@ -861,9 +866,12 @@ public class GotoController {
         return map;
     }
 ```
+</details>
 
 ### 3.4.2 请求响应源码分析 <a id="3.4.2"></a>
 
+<details>
+  <summary>DispatcherServlet</summary>
 
 ```java
 public class DispatcherServlet extends FrameworkServlet {
@@ -1059,6 +1067,10 @@ public class DispatcherServlet extends FrameworkServlet {
   
 }
 ```
+</details>
+
+<details>
+  <summary>ContentNegotiatingViewResolver</summary>
 
 ```java
 public class ContentNegotiatingViewResolver extends WebApplicationObjectSupport
@@ -1097,6 +1109,10 @@ public class ContentNegotiatingViewResolver extends WebApplicationObjectSupport
   
   
 ```
+</details>
+
+<details>
+  <summary>AbstractView</summary>
 
 ```java
 public abstract class AbstractView extends WebApplicationObjectSupport implements View, BeanNameAware {
@@ -1224,7 +1240,12 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
 }
 	
 ```
+</details>
 
+<details>
+  <summary>RequestMappingHandlerAdapter</summary>
+
+<a id="RequestMappingHandlerAdapter"></a>
 ```java
 public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
         implements BeanFactoryAware, InitializingBean {
@@ -1291,6 +1312,7 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
             }
             //为请求设置返回处理器
             //将确定目标方法的返回值类型
+            //img13
             if (this.returnValueHandlers != null) {
                 invocableMethod.setHandlerMethodReturnValueHandlers(this.returnValueHandlers);
             }
@@ -1363,7 +1385,12 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
   
 }
 ```
+</details>
 
+<details>
+  <summary>ServletInvocableHandlerMethod</summary>
+
+<a id="ServletInvocableHandlerMethod"></a>
 ```java
 public class ServletInvocableHandlerMethod extends InvocableHandlerMethod {
     ...
@@ -1489,7 +1516,42 @@ public class ServletInvocableHandlerMethod extends InvocableHandlerMethod {
         }
         return result;
     }
+
+  /**
+   * Iterate over registered {@link HandlerMethodReturnValueHandler HandlerMethodReturnValueHandlers} and invoke the one that supports it.
+   * @throws IllegalStateException if no suitable {@link HandlerMethodReturnValueHandler} is found.
+   * 迭代已注册的{@link HandlerMethodReturnValueHandler HandlerMethodReturnValueHandlers}并调用支持它的一个。
+   * 如果没有找到合适的{@link HandlerMethodReturnValueHandler}， @抛出IllegalStateException。
+   */
+  @Override
+  public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
+                                ModelAndViewContainer mavContainer, NativeWebRequest webRequest) throws Exception {
+      HandlerMethodReturnValueHandler handler = selectHandler(returnValue, returnType);
+      if (handler == null) {
+          throw new IllegalArgumentException("Unknown return value type: " + returnType.getParameterType().getName());
+      }
+      handler.handleReturnValue(returnValue, returnType, mavContainer, webRequest);
+  }
+  
+  @Nullable
+  private HandlerMethodReturnValueHandler selectHandler(@Nullable Object value, MethodParameter returnType) {
+      boolean isAsyncValue = isAsyncReturnValue(value, returnType);
+      for (HandlerMethodReturnValueHandler handler : this.returnValueHandlers) {
+          if (isAsyncValue && !(handler instanceof AsyncHandlerMethodReturnValueHandler)) {
+              continue;
+          }
+          if (handler.supportsReturnType(returnType)) {
+              return handler;
+          }
+      }
+      return null;
+  }
+  
 ```
+</details>
+
+<details>
+  <summary>RequestParamMethodArgumentResolver</summary>
 
 ```java
 //@RequestParam 注解参数解析器  
@@ -1641,6 +1703,10 @@ public class RequestParamMapMethodArgumentResolver implements HandlerMethodArgum
   }
 }
 ```
+</details>
+
+<details>
+  <summary>ViewNameMethodReturnValueHandler</summary>
 
 ```java
 public class ViewNameMethodReturnValueHandler implements HandlerMethodReturnValueHandler {
@@ -1698,8 +1764,311 @@ public class ViewNameMethodReturnValueHandler implements HandlerMethodReturnValu
     }
 }
 ```
+</details>
 
+<details>
+  <summary>RequestResponseBodyMethodProcessor</summary>
 
+```java
+public class RequestResponseBodyMethodProcessor extends AbstractMessageConverterMethodProcessor {
+
+  /**
+   * Whether the given {@linkplain MethodParameter method return type} is
+   * supported by this handler.
+   * @param returnType the method return type to check
+   * @return {@code true} if this handler supports the supplied return type;
+   * {@code false} otherwise
+   * 此处理程序是否支持给定的{@linkplain MethodParameter方法返回类型}。
+   * @param returnType方法返回类型，以检查@return {@code true}该处理程序是否支持提供的返回类型;
+   */
+  @Override
+  public boolean supportsReturnType(MethodParameter returnType) {
+    return (AnnotatedElementUtils.hasAnnotation(returnType.getContainingClass(), ResponseBody.class) ||
+            returnType.hasMethodAnnotation(ResponseBody.class));
+  }
+
+  /**
+   * Handle the given return value by adding attributes to the model and
+   * setting a view or setting the
+   * {@link ModelAndViewContainer#setRequestHandled} flag to {@code true}
+   * to indicate the response has been handled directly.
+   * @param returnValue the value returned from the handler method
+   * @param returnType the type of the return value. This type must have
+   * previously been passed to {@link #supportsReturnType} which must
+   * have returned {@code true}.
+   * @param mavContainer the ModelAndViewContainer for the current request
+   * @param webRequest the current request
+   * @throws Exception if the return value handling results in an error
+   * 
+   * 通过向模型添加属性并设置视图或将{@link ModelAndViewContainersetRequestHandled}标志
+   * 设置为{@code true}来处理给定的返回值，以指示已经直接处理了响应。
+   * @param returnType返回值的类型。此类型之前必须传递给{@link supportsReturnType}，后者必须返回{@code true}。
+   */
+  @Override
+  public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
+                                ModelAndViewContainer mavContainer, NativeWebRequest webRequest)
+          throws IOException, HttpMediaTypeNotAcceptableException, HttpMessageNotWritableException {
+
+    mavContainer.setRequestHandled(true);
+    ServletServerHttpRequest inputMessage = createInputMessage(webRequest);
+    ServletServerHttpResponse outputMessage = createOutputMessage(webRequest);
+
+    // Try even with null return value. ResponseBodyAdvice could get involved.
+    //即使返回值为空也要尝试。ResponseBodyAdvice可以参与进来。
+    //使用消息转换器进行写出操作
+    writeWithMessageConverters(returnValue, returnType, inputMessage, outputMessage);
+  }
+
+  /**
+   * Writes the given return type to the given output message.
+   * @param value the value to write to the output message
+   * @param returnType the type of the value
+   * @param inputMessage the input messages. Used to inspect the {@code Accept} header.
+   * @param outputMessage the output message to write to
+   * @throws IOException thrown in case of I/O errors
+   * @throws HttpMediaTypeNotAcceptableException thrown when the conditions indicated
+   * by the {@code Accept} header on the request cannot be met by the message converters
+   * @throws HttpMessageNotWritableException thrown if a given message cannot
+   * be written by a converter, or if the content-type chosen by the server
+   * has no compatible converter.
+   * 将给定的返回类型写入给定的输出消息。
+   */
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  protected <T> void writeWithMessageConverters(@Nullable T value, MethodParameter returnType,
+                                                ServletServerHttpRequest inputMessage, ServletServerHttpResponse outputMessage)
+          throws IOException, HttpMediaTypeNotAcceptableException, HttpMessageNotWritableException {
+
+    Object body;
+    Class<?> valueType;
+    Type targetType;
+
+    if (value instanceof CharSequence) {
+      body = value.toString();
+      valueType = String.class;
+      targetType = String.class;
+    }
+    else {
+      body = value;
+      valueType = getReturnValueType(body, returnType);
+      targetType = GenericTypeResolver.resolveType(getGenericType(returnType), returnType.getContainingClass());
+    }
+
+    //是否是资源类型(流数据)
+    if (isResourceType(value, returnType)) {
+      outputMessage.getHeaders().set(HttpHeaders.ACCEPT_RANGES, "bytes");
+      if (value != null && inputMessage.getHeaders().getFirst(HttpHeaders.RANGE) != null &&
+              outputMessage.getServletResponse().getStatus() == 200) {
+        Resource resource = (Resource) value;
+        try {
+          List<HttpRange> httpRanges = inputMessage.getHeaders().getRange();
+          outputMessage.getServletResponse().setStatus(HttpStatus.PARTIAL_CONTENT.value());
+          body = HttpRange.toResourceRegions(httpRanges, resource);
+          valueType = body.getClass();
+          targetType = RESOURCE_REGION_LIST_TYPE;
+        }
+        catch (IllegalArgumentException ex) {
+          outputMessage.getHeaders().set(HttpHeaders.CONTENT_RANGE, "bytes */" + resource.contentLength());
+          outputMessage.getServletResponse().setStatus(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE.value());
+        }
+      }
+    }
+    //媒体类型
+    MediaType selectedMediaType = null;
+    //获取响应请求头中是否已有类型 缓存值
+    MediaType contentType = outputMessage.getHeaders().getContentType();
+    boolean isContentTypePreset = contentType != null && contentType.isConcrete();
+    if (isContentTypePreset) {
+      if (logger.isDebugEnabled()) {
+        logger.debug("Found 'Content-Type:" + contentType + "' in response");
+      }
+      selectedMediaType = contentType;
+    }
+    else {
+      HttpServletRequest request = inputMessage.getServletRequest();
+      List<MediaType> acceptableTypes;
+      try {
+          //获取该request 能接收的媒体类型(即客户端能支持的媒体类型) img14 (获取客户端请求头Accept字段)
+        acceptableTypes = getAcceptableMediaTypes(request);
+      }
+      catch (HttpMediaTypeNotAcceptableException ex) {
+        int series = outputMessage.getServletResponse().getStatus() / 100;
+        if (body == null || series == 4 || series == 5) {
+          if (logger.isDebugEnabled()) {
+            logger.debug("Ignoring error response content (if any). " + ex);
+          }
+          return;
+        }
+        throw ex;
+      }
+      //获取该request 服务器所能生成(可响应)的媒体类型 img14
+      List<MediaType> producibleTypes = getProducibleMediaTypes(request, valueType, targetType);
+
+      if (body != null && producibleTypes.isEmpty()) {
+        throw new HttpMessageNotWritableException(
+                "No converter found for return value of type: " + valueType);
+      }
+      List<MediaType> mediaTypesToUse = new ArrayList<>();
+      //匹配能使用的媒体类型
+      for (MediaType requestedType : acceptableTypes) {
+        for (MediaType producibleType : producibleTypes) {
+          if (requestedType.isCompatibleWith(producibleType)) {
+            mediaTypesToUse.add(getMostSpecificMediaType(requestedType, producibleType));
+          }
+        }
+      }
+      if (mediaTypesToUse.isEmpty()) {
+        if (logger.isDebugEnabled()) {
+          logger.debug("No match for " + acceptableTypes + ", supported: " + producibleTypes);
+        }
+        if (body != null) {
+          throw new HttpMediaTypeNotAcceptableException(producibleTypes);
+        }
+        return;
+      }
+
+      MediaType.sortBySpecificityAndQuality(mediaTypesToUse);
+
+      //去重匹配好的媒体类型结果，确定最佳匹配类型
+      for (MediaType mediaType : mediaTypesToUse) {
+        if (mediaType.isConcrete()) {
+          selectedMediaType = mediaType;
+          break;
+        }
+        else if (mediaType.isPresentIn(ALL_APPLICATION_MEDIA_TYPES)) {
+          selectedMediaType = MediaType.APPLICATION_OCTET_STREAM;
+          break;
+        }
+      }
+
+      if (logger.isDebugEnabled()) {
+        logger.debug("Using '" + selectedMediaType + "', given " +
+                acceptableTypes + " and supported " + producibleTypes);
+      }
+    }
+
+    if (selectedMediaType != null) {
+      selectedMediaType = selectedMediaType.removeQualityValue();
+      //判断哪个converter能处理 img15
+      for (HttpMessageConverter<?> converter : this.messageConverters) {
+        GenericHttpMessageConverter genericConverter = (converter instanceof GenericHttpMessageConverter ?
+                (GenericHttpMessageConverter<?>) converter : null);
+        //MappingJackson2HttpMessageConverter 支持json类型转换
+        if (genericConverter != null ?
+                ((GenericHttpMessageConverter) converter).canWrite(targetType, valueType, selectedMediaType) :
+                converter.canWrite(valueType, selectedMediaType)) {
+          body = getAdvice().beforeBodyWrite(body, returnType, selectedMediaType,
+                  (Class<? extends HttpMessageConverter<?>>) converter.getClass(),
+                  inputMessage, outputMessage);
+          if (body != null) {
+            Object theBody = body;
+            LogFormatUtils.traceDebug(logger, traceOn ->
+                    "Writing [" + LogFormatUtils.formatValue(theBody, !traceOn) + "]");
+            addContentDispositionHeader(inputMessage, outputMessage);
+            if (genericConverter != null) {
+                //通过消息转换器 将对应类型数据转换并写入response
+              genericConverter.write(body, targetType, selectedMediaType, outputMessage);
+            }
+            else {
+              ((HttpMessageConverter) converter).write(body, selectedMediaType, outputMessage);
+            }
+          }
+          else {
+            if (logger.isDebugEnabled()) {
+              logger.debug("Nothing to write: null body");
+            }
+          }
+          return;
+        }
+      }
+    }
+
+    if (body != null) {
+      Set<MediaType> producibleMediaTypes =
+              (Set<MediaType>) inputMessage.getServletRequest()
+                      .getAttribute(HandlerMapping.PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE);
+
+      if (isContentTypePreset || !CollectionUtils.isEmpty(producibleMediaTypes)) {
+        throw new HttpMessageNotWritableException(
+                "No converter for [" + valueType + "] with preset Content-Type '" + contentType + "'");
+      }
+      throw new HttpMediaTypeNotAcceptableException(getSupportedMediaTypes(body.getClass()));
+    }
+  }
+
+  /**
+   * This implementation sets the default headers by calling {@link #addDefaultHeaders},
+   * and then calls {@link #writeInternal}.
+   * 这个实现通过调用{@link addDefaultHeaders}来设置默认头，然后调用{@link writeInternal}。
+   */
+  @Override
+  public final void write(final T t, @Nullable final Type type, @Nullable MediaType contentType,
+                          HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
+
+    final HttpHeaders headers = outputMessage.getHeaders();
+    //添加请求头
+    addDefaultHeaders(headers, t, contentType);
+
+    if (outputMessage instanceof StreamingHttpOutputMessage) {
+      StreamingHttpOutputMessage streamingOutputMessage = (StreamingHttpOutputMessage) outputMessage;
+      streamingOutputMessage.setBody(outputStream -> writeInternal(t, type, new HttpOutputMessage() {
+        @Override
+        public OutputStream getBody() {
+          return outputStream;
+        }
+        @Override
+        public HttpHeaders getHeaders() {
+          return headers;
+        }
+      }));
+    }
+    else {
+        //MappingJackson2HttpMessageConverter 把对象转为JSON
+        //（利用底层的jackson的objectMapper转换的） 再执行写入response操作  img17
+      writeInternal(t, type, outputMessage);
+      outputMessage.getBody().flush();
+    }
+  }
+
+  /**
+   * Returns the media types that can be produced. The resulting media types are:
+   * <ul>
+   * <li>The producible media types specified in the request mappings, or
+   * <li>Media types of configured converters that can write the specific return value, or
+   * <li>{@link MediaType#ALL}
+   * </ul>
+   * 返回可生成的媒体类型。结果的媒体类型是:在请求映射中指定的可生产的媒体类型，
+   * 或配置的转换器的媒体类型，可以写入特定的返回值，或{@link MediaTypeALL}
+   * @since 4.2
+   */
+  @SuppressWarnings("unchecked")
+  protected List<MediaType> getProducibleMediaTypes(
+          HttpServletRequest request, Class<?> valueClass, @Nullable Type targetType) {
+
+    Set<MediaType> mediaTypes =
+            (Set<MediaType>) request.getAttribute(HandlerMapping.PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE);
+    if (!CollectionUtils.isEmpty(mediaTypes)) {
+      return new ArrayList<>(mediaTypes);
+    }
+    List<MediaType> result = new ArrayList<>();
+    //遍历循环服务器所有的的 MessageConverter，看哪个支持操作这个对象（Person）
+    for (HttpMessageConverter<?> converter : this.messageConverters) {
+      if (converter instanceof GenericHttpMessageConverter && targetType != null) {
+        if (((GenericHttpMessageConverter<?>) converter).canWrite(targetType, valueClass, null)) {
+          result.addAll(converter.getSupportedMediaTypes(valueClass));
+        }
+      }
+      else if (converter.canWrite(valueClass, null)) {
+        result.addAll(converter.getSupportedMediaTypes(valueClass));
+      }
+    }
+    return (result.isEmpty() ? Collections.singletonList(MediaType.ALL) : result);
+  }
+}
+```
+</details>
+
+<details>
+  <summary>代码分析过程断点变量阐释</summary>
 
 ![img_1.png](assets/img_1.png)
 ![img_2.png](assets/img_2.png)
@@ -1710,6 +2079,25 @@ public class ViewNameMethodReturnValueHandler implements HandlerMethodReturnValu
 ![img_7.png](assets/img_7.png)
 ![img_9.png](assets/img_9.png)
 ![img_10.png](assets/img_10.png)
+![img_13.png](assets/img_13.png)
+![img_14.png](assets/img_14.png)
+![img_15.png](assets/img_15.png)
+0. 支持返回值类型为 Byte类型的
+1. 支持返回值类型为 String
+2. String
+3. Resource
+4. ResourceRegion
+5. DOMSource.class \ SAXSource.class \ StAXSource.class \StreamSource.class \Source.class (xml解析)
+6. MultiValueMap
+7. true(MappingJackson2HttpMessageConverter)
+8. true
+9. 支持注解方式xml处理的。
+
+![img_17.png](assets/img_17.png)
+
+</details>
+
+<a id="3.4.2.1"></a>
 
 * HandlerMapping中找到能处理请求的Handler（Controller的请求方法） getHandler()
 * 为当前Handler 找一个适配器 HandlerAdapter； RequestMappingHandlerAdapter
@@ -1746,6 +2134,19 @@ public class ViewNameMethodReturnValueHandler implements HandlerMethodReturnValu
   * 执行doInvoke()方法，将解析后的请求参数，放行给对应的请求方法去执行 
 * 请求方法去执行完毕后获取到返回值 returnValue，设置返回状态 setResponseStatus(webRequest)
 * 处理返回值 returnValueHandlers.handleReturnValue 确定返回值类型
+  * 遍历返回值处理器判断是否支持这种类型返回值 supportsReturnType()
+  * 返回值处理器调用 handleReturnValue() 进行处理
+  * RequestResponseBodyMethodProcessor 可以处理返回值标了@ResponseBody 注解的。
+    * 支持以下2种写法的请求方法， @ResponseBody可放在类或者方法上
+      * @RestController (@Controller/@ResponseBody) 写法
+      * @Controller (@PostMapping/@ResponseBody) 写法
+    * 利用 MessageConverters 消息转换器处理@ResponseBody注解的数据(Bean对象),将数据写为json
+      * 内容协商（浏览器默认会以请求头的方式告诉服务器他能接受什么样的内容类型）
+        * Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+      * 服务器最终根据自己自身的能力，决定服务器能生产出什么样内容类型的数据，
+      * SpringMVC会挨个遍历所有容器底层的 HttpMessageConverter ，看谁能处理？
+        * 得到MappingJackson2HttpMessageConverter可以将对象写为json
+        * 利用MappingJackson2HttpMessageConverter将对象转为json再写出去。
 * 请求处理完毕后，执行getModelAndView(mavContainer, modelFactory, webRequest)，处理放在 ModelAndViewContainer 数据视图容器内的数据(Model=数据/View=数据返回地址)
 * (RequestMappingHandlerAdapter) ha.handle(processedRequest, response, mappedHandler.getHandler()) 执行完毕， 返回ModelAndView
 * mappedHandler.applyPostHandle(processedRequest, response, mv) 应用注册拦截器的postHandle方法。
@@ -1775,6 +2176,9 @@ public class ViewNameMethodReturnValueHandler implements HandlerMethodReturnValu
 * Locale
 * TimeZone
 * ZoneId
+
+<details>
+  <summary>ServletRequestMethodArgumentResolver</summary>
 
 ```java
 /**
@@ -1837,6 +2241,7 @@ public class ServletRequestMethodArgumentResolver implements HandlerMethodArgume
 }
 
 ```
+</details>
 
 ### 3.4.4 复杂参数
 
@@ -1890,6 +2295,9 @@ public class ServletRequestMethodArgumentResolver implements HandlerMethodArgume
             }
             
 ```
+
+<details>
+  <summary>MapMethodProcessor</summary>
 
 ```java
 /**
@@ -1976,12 +2384,24 @@ public class ModelAndViewContainer {
 }
   
 ```
+</details>
 
 ![img_8.png](assets/img_8.png)
 
 ### 3.4.5 自定义对象参数
 
-> 实体类数据Bean:可以自动类型转换与格式化，可以级联封装
+> 自定义 Bean实体类数据:可以自动类型转换与格式化，可以级联封装，和对象属性进行绑定
+
+* ServletModelAttributeMethodProcessor 负责解析参数
+  * WebDataBinder binder = binderFactory.createBinder(webRequest, attribute, name); 
+  * Web数据绑定器 使用Converters 数据转换器，将request请求域中参数通过反射转化为指定的数据类型，再与具体的Bean实例属性绑定
+  * GenericConversionService 类型转化器-在设置每一个值的时候，遍历Converters 中哪个转换器可以将这个数据类型（request请求域中的参数）转换到指定的类型（JavaBean -> Integer）/ byte -- > file
+  * 回顾SpringMvc 自动配置原理
+    * ● Automatic registration of Converter, GenericConverter, and Formatter beans.
+    * ○ 自动注册 Converter，GenericConverter，Formatter (类型转化器)
+    * ● Automatic use of a ConfigurableWebBindingInitializer bean (covered later in this document).
+    * ○ 自动使用 ConfigurableWebBindingInitializer ，（DataBinder负责将请求数据绑定到JavaBean上）(数据绑定器)
+* 通过WebMvcConfigurer 定制化springmvc 配置addFormatters() 可自定义参数类型转换器 FormatterRegistry.addConverter()
 
 ```java
 /**
@@ -2009,3 +2429,288 @@ public class Pet {
 
 }
 ```
+
+<details>
+  <summary>ServletModelAttributeMethodProcessor</summary>
+
+```java
+/**
+ * Resolve {@code @ModelAttribute} annotated method arguments and handle
+ * return values from {@code @ModelAttribute} annotated methods.
+ *
+ * <p>Model attributes are obtained from the model or created with a default
+ * constructor (and then added to the model). Once created the attribute is
+ * populated via data binding to Servlet request parameters. Validation may be
+ * applied if the argument is annotated with {@code @javax.validation.Valid}.
+ * or Spring's own {@code @org.springframework.validation.annotation.Validated}.
+ *
+ * <p>When this handler is created with {@code annotationNotRequired=true}
+ * any non-simple type argument and return value is regarded as a model
+ * attribute with or without the presence of an {@code @ModelAttribute}.
+ *
+ * 解析{@code @ModelAttribute}注释方法参数并处理{@code @ModelAttribute}注释方法的返回值。
+ * 模型属性从模型中获得，或者用默认构造函数创建(然后添加到模型中)。
+ * 一旦创建了属性，就通过与Servlet请求参数的数据绑定来填充属性。
+ * 如果参数用{@code @javax. validate .valid}注释，则可以应用验证。
+ * 或者Spring自己的{@code @org.springframework.validation.annotation.Validated}。
+ * 当使用{@code annotationnotrerequired =true}创建此处理程序时，
+ * 任何非简单类型参数和返回值都被视为带有或不带有{@code @ModelAttribute}的模型属性。
+ * 
+ * @author Rossen Stoyanchev
+ * @author Juergen Hoeller
+ * @author Sebastien Deleuze
+ * @author Vladislav Kisel
+ * @since 3.1
+ */
+public class ServletModelAttributeMethodProcessor implements HandlerMethodArgumentResolver, HandlerMethodReturnValueHandler {
+
+  /**
+   * Returns {@code true} if the parameter is annotated with
+   * {@link ModelAttribute} or, if in default resolution mode, for any
+   * method parameter that is not a simple type.
+   * 如果参数用{@link ModelAttribute}注释，则返回{@code true};
+   * 如果在默认解析模式下，则返回任何非简单类型的方法参数。
+   */
+  @Override
+  public boolean supportsParameter(MethodParameter parameter) {
+      //非简单类型的方法参数，则满足条件
+      return (parameter.hasParameterAnnotation(ModelAttribute.class) ||
+            (this.annotationNotRequired && !BeanUtils.isSimpleProperty(parameter.getParameterType())));
+  }
+
+  /**
+   * Resolve the argument from the model or if not found instantiate it with
+   * its default if it is available. The model attribute is then populated
+   * with request values via data binding and optionally validated
+   * if {@code @java.validation.Valid} is present on the argument.
+   * @throws BindException if data binding and validation result in an error
+   * and the next method parameter is not of type {@link Errors}
+   * @throws Exception if WebDataBinder initialization fails
+   * 从模型中解析参数，如果未找到参数，则使用默认值实例化它。然后，模型属性通过数据绑定填充请求值，
+   * 如果{@code @java.validation则可选验证。Valid}存在于实参中。如果数据绑定和验证导致错误，
+   * 并且下一个方法参数不是{@link Errors}类型
+   */
+  @Override
+  @Nullable
+  public final Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
+                                      NativeWebRequest webRequest, @Nullable WebDataBinderFactory binderFactory) throws Exception {
+
+    Assert.state(mavContainer != null, "ModelAttributeMethodProcessor requires ModelAndViewContainer");
+    Assert.state(binderFactory != null, "ModelAttributeMethodProcessor requires WebDataBinderFactory");
+
+    String name = ModelFactory.getNameForParameter(parameter);
+    ModelAttribute ann = parameter.getParameterAnnotation(ModelAttribute.class);
+    if (ann != null) {
+      mavContainer.setBinding(name, ann.binding());
+    }
+
+    Object attribute = null;
+    BindingResult bindingResult = null;
+
+    if (mavContainer.containsAttribute(name)) {
+      attribute = mavContainer.getModel().get(name);
+    }
+    else {
+      // Create attribute instance 创建一个空的属性实例
+      try {
+        attribute = createAttribute(name, parameter, binderFactory, webRequest);
+      }
+      catch (BindException ex) {
+        if (isBindExceptionRequired(parameter)) {
+          // No BindingResult parameter -> fail with BindException
+          throw ex;
+        }
+        // Otherwise, expose null/empty value and associated BindingResult
+        if (parameter.getParameterType() == Optional.class) {
+          attribute = Optional.empty();
+        }
+        else {
+          attribute = ex.getTarget();
+        }
+        bindingResult = ex.getBindingResult();
+      }
+    }
+
+    if (bindingResult == null) {
+      // Bean property binding and validation; Bean属性绑定和验证; 
+      // skipped in case of binding failure on construction. 如果在构造时绑定失败，则跳过。
+      //创建数据绑定器
+      WebDataBinder binder = binderFactory.createBinder(webRequest, attribute, name);
+      if (binder.getTarget() != null) {
+        if (!mavContainer.isBindingDisabled(name)) {
+          //将request请求域中参数通过反射与之前创建的实例属性绑定
+          bindRequestParameters(binder, webRequest);
+        }
+        validateIfApplicable(binder, parameter);
+        if (binder.getBindingResult().hasErrors() && isBindExceptionRequired(binder, parameter)) {
+          throw new BindException(binder.getBindingResult());
+        }
+      }
+      // Value type adaptation, also covering java.util.Optional
+      if (!parameter.getParameterType().isInstance(attribute)) {
+        attribute = binder.convertIfNecessary(binder.getTarget(), parameter.getParameterType(), parameter);
+      }
+      bindingResult = binder.getBindingResult();
+    }
+
+    // Add resolved attribute and BindingResult at the end of the model
+    Map<String, Object> bindingResultModel = bindingResult.getModel();
+    mavContainer.removeAttributes(bindingResultModel);
+    mavContainer.addAllAttributes(bindingResultModel);
+
+    return attribute;
+  }
+  
+}
+```
+</details>
+
+```java
+    @Bean
+    public WebMvcConfigurer webMvcConfigurer(){
+        WebMvcConfigurer webMvcConfigurer = new WebMvcConfigurer(){
+          /**
+           * Add {@link Converter Converters} and {@link Formatter Formatters} in addition to the ones
+           * registered by default.
+           * 在默认注册的基础上增加{@link Converter Converter}和{@link Formatter Formatters}。
+           */
+          @Override
+          public void addFormatters(FormatterRegistry registry){}
+        }
+    }
+        
+```
+![img_11.png](assets/img_11.png)
+
+
+# 4.数据响应与内容协商
+
+## 4.1 数据响应
+![img_12.png](assets/img_12.png)
+
+### 4.1.1 响应Json
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+<!--web场景自动引入了json场景-->
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-json</artifactId>
+  <version>2.3.4.RELEASE</version>
+  <scope>compile</scope>
+</dependency>
+
+<dependency>
+  <groupId>com.fasterxml.jackson.core</groupId>
+  <artifactId>jackson-databind</artifactId>
+  <version>2.13.3</version>
+  <scope>compile</scope>
+</dependency>
+
+<dependency>
+  <groupId>com.fasterxml.jackson.datatype</groupId>
+  <artifactId>jackson-datatype-jdk8</artifactId>
+  <version>2.13.3</version>
+  <scope>compile</scope>
+</dependency>
+```
+
+```java
+@PostMapping("/getPerson")
+public Person getPerson(@RequestParam Integer personId){
+    Map<String,Object> map = new HashMap<>();
+    Person person = new Person("name-" + personId, 0);
+    return person;
+}
+```
+
+[详见RequestMappingHandlerAdapter 返回值解析器分析](#RequestMappingHandlerAdapter)
+
+[详见ServletInvocableHandlerMethod 返回值处理分析](#ServletInvocableHandlerMethod)
+
+
+### 4.1.2 SpringMvc支持的返回值类型
+* ModelAndView
+* Model
+* View
+* ResponseEntity
+* ResponseBodyEmitter
+* StreamingResponseBody
+* HttpEntity
+* HttpHeaders
+* Callable
+* DeferredResult
+* ListenableFuture
+* CompletionStage
+* WebAsyncTask
+* 返回值标注 @ModelAttribute 且为对象类型的
+* @ResponseBody 注解 ---> RequestResponseBodyMethodProcessor
+  * 支持以下2种写法的请求方法， @ResponseBody可放在类或者方法上
+    * @RestController (@Controller/@ResponseBody) 写法
+    * @Controller (@PostMapping/@ResponseBody) 写法
+
+### 4.1.3 HTTPMessageConverter原理
+
+`MessageConverter规范`
+![img_16.png](assets/img_16.png)
+* 判断该Meidatype 类型是否支持转换该class 对象
+  * 如Person转换为json， json转换为Person Bean对象
+
+## 4.2 内容协商
+> 根据客户端接收能力不同，返回不同媒体类型的数据。
+```xml
+<!--支持返回xml 类型数据解析-->
+<dependency>
+    <groupId>com.fasterxml.jackson.dataformat</groupId>
+    <artifactId>jackson-dataformat-xml</artifactId>
+</dependency>
+```
+引入xml返回值解析包后，因浏览器可接收数据类型xml 优先级高于其他类型，则优先返回xml数据类型
+```xml
+请求 /saveUser?userName=zhangsan&age=18&birth=2022%2F12%2F10&pet.name=%E9%98%BF%E7%8C%AB&pet.age=5 
+Content-Type:application/xhtml+xml;charset=UTF-8
+Accept:text/html,application/xhtml+xml,application/xml;q=0.9,  image/avif,image/webp,*/*;q=0.8
+<Map>
+  <person>Person{userName='zhangsan', age=18, weight='null', birth=Sat Dec 10 00:00:00 CST 2022, pet=Pet{name='阿猫', age=5}}</person>
+</Map>
+```
+![img_18.png](assets/img_18.png)
+
+### 4.2.1 postman分别测试返回json和xml
+> 只需要改变请求头中Accept字段。Http协议中规定的，告诉服务器本客户端可以接收的数据类型。
+
+![img_19.png](assets/img_19.png)
+
+### 4.2.2 内容协商原理
+> 在响应请求时，处理返回值类型时体现
+
+[详见请求响应源码分析总结](#3.4.2.1)
+
+1. 判断当前响应头中是否已经有之前请求缓存了的，确定的媒体类型。MediaType
+2. 获取客户端（PostMan、浏览器）支持接收的内容类型。（获取客户端Accept请求头字段）[application/xml] [application/json]
+   * ContentNegotiationManager 内容协商管理器 默认使用基于请求头的策略
+     * 原理就是利用 request.getHeaderValues(HttpHeaders.ACCEPT) 获取请求头中Accept字段内容
+   * HeaderContentNegotiationStrategy (请求头内容协商策略)确定客户端可以接收的内容类型
+3. 遍历循环所有当前系统的 MessageConverter，看谁支持操作这个对象（Person）
+4. 找到支持操作Person的converter，把converter支持的媒体类型统计出来。
+5. 客户端需要 [application/xml]。服务端能力[10种、json、xml]
+6. 将二者进行内容协商的最佳匹配媒体类型
+7. 再匹配所有MessageConverter 看哪个支持将对象转为最佳匹配媒体类型(xml/json)，将对应类型数据转换并写入response
+
+### 4.2.3 开启浏览器参数方式内容协商功能
+> 为了方便内容协商，开启基于请求参数的内容协商功能。
+
+spring:
+  contentnegotiation:
+    favor-parameter: true  #开启请求参数内容协商模式
+
+
+
+
+
+
+
+
+

@@ -16,13 +16,24 @@ import org.springframework.core.convert.converter.ConditionalConverter;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.format.Formatter;
 import org.springframework.format.FormatterRegistry;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.util.StringUtils;
+import org.springframework.web.accept.HeaderContentNegotiationStrategy;
+import org.springframework.web.accept.ParameterContentNegotiationStrategy;
 import org.springframework.web.filter.HiddenHttpMethodFilter;
 import org.springframework.web.servlet.DispatcherServlet;
+import org.springframework.web.servlet.config.annotation.ContentNegotiationConfigurer;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.util.UrlPathHelper;
 import org.yaml.snakeyaml.LoaderOptions;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @author hongyuan
@@ -88,6 +99,11 @@ public class RunningConfig {
         return methodFilter;
     }
 
+    /**
+     * @author Aloha
+     * @date 2022/12/5 15:32
+     * @description WebMvcConfigurer 定制化SpringMVC 的功能
+     */
     @Bean
     public WebMvcConfigurer webMvcConfigurer(){
         WebMvcConfigurer webMvcConfigurer = new WebMvcConfigurer() {
@@ -161,6 +177,40 @@ public class RunningConfig {
                         return Converter.super.andThen(after);
                     }
                 });
+            }
+
+            /**
+             * @author Aloha
+             * @date 2022/12/5 16:00
+             * @description 扩展MessageConverter 配置，添加自定义MessageConverter，支持自定义协议 [application/x-guigu]
+             */
+            @Override
+            public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
+                CustomHttpMessageConverter httpMessageConverter = new CustomHttpMessageConverter();
+                converters.add(httpMessageConverter);
+                WebMvcConfigurer.super.extendMessageConverters(converters);
+            }
+
+            /**
+             * @author Aloha
+             * @date 2022/12/5 18:35
+             * @description 配置内容协商，修改默认的ParameterContentNegotiationStrategy 媒体类型使其支持自定义协议 [application/x-guigu]
+             */
+            @Override
+            public void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
+                //参考 WebMvcConfigurationSupport.mvcContentNegotiationManager()
+                //设置自定义 ParameterContentNegotiationStrategy 支持的媒体类型
+                Map<String, MediaType> mediaTypes = new HashMap<>(4);
+                mediaTypes.put("xml", MediaType.APPLICATION_XML);
+                mediaTypes.put("json", MediaType.APPLICATION_JSON);
+                mediaTypes.put("gg", MediaType.parseMediaType("application/x-guigu"));
+                //指定支持解析哪些参数对应的媒体类型
+                ParameterContentNegotiationStrategy parameterContentNegotiationStrategy = new ParameterContentNegotiationStrategy(mediaTypes);
+                //添加默认的请求头内容协商
+                HeaderContentNegotiationStrategy headerContentNegotiationStrategy = new HeaderContentNegotiationStrategy();
+                configurer.strategies(Arrays.asList(parameterContentNegotiationStrategy,headerContentNegotiationStrategy));
+
+                WebMvcConfigurer.super.configureContentNegotiation(configurer);
             }
         };
         return webMvcConfigurer;

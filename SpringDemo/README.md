@@ -2100,7 +2100,7 @@ public class RequestResponseBodyMethodProcessor extends AbstractMessageConverter
 <a id="3.4.2.1"></a>
 
 * HandlerMapping中找到能处理请求的Handler（Controller的请求方法） getHandler()
-* 为当前Handler 找一个适配器 HandlerAdapter； RequestMappingHandlerAdapter
+* 为当前Handler 找一个适配器 HandlerAdapter(RequestMappingHandlerAdapter)
   * RequestMappingHandlerAdapter 负责处理 @RequestMapping标注的请求方法
 * argumentResolvers 确定将要执行的目标方法的每一个参数的值是什么;
   * SpringMVC目标方法能写多少种参数类型。取决于参数解析器。
@@ -2698,19 +2698,308 @@ Accept:text/html,application/xhtml+xml,application/xml;q=0.9,  image/avif,image/
 5. 客户端需要 [application/xml]。服务端能力[10种、json、xml]
 6. 将二者进行内容协商的最佳匹配媒体类型
 7. 再匹配所有MessageConverter 看哪个支持将对象转为最佳匹配媒体类型(xml/json)，将对应类型数据转换并写入response
+![img_15.png](assets/img_15.png)
 
 ### 4.2.3 开启浏览器参数方式内容协商功能
 > 为了方便内容协商，开启基于请求参数的内容协商功能。
 
-spring:
-  contentnegotiation:
-    favor-parameter: true  #开启请求参数内容协商模式
+`开启请求参数内容协商模式` spring.mvc.contentnegotiation.favor-parameter=true
+
+![img_20.png](assets/img_20.png)
+示例
+
+* http://localhost:8088/getPerson?personId=9&format=xml
+* http://localhost:8088/getPerson?personId=9&format=json
+
+![img_21.png](assets/img_21.png)
+
+* ParameterContentNegotiationStrategy 请求参数内容协商策略(支持json/xml 两种参数类型)
+* HeaderContentNegotiationStrategy 请求头内容协商策略
+
+有多个内容协商策略时，确定客户端接收什么样的内容类型
+1. ParameterContentNegotiationStrategy 策略优先解析，确定是要返回json数据(获取请求参数中的format的值) request.getParameter("format")
+2. 最终进行内容协商返回给客户端指定媒体类型即可(json/xml)
+
+### 4.2.4 自定义 MessageConverter
+> 实现多协议数据兼容。json/xml/x-guigu
+0. @ResponseBody 响应数据出去 调用 RequestResponseBodyMethodProcessor 处理
+1. Processor 处理方法返回值。通过 MessageConverter 处理
+2. 所有 MessageConverter 合起来可以支持各种媒体类型数据的操作（读、写）
+3. 内容协商找到最终的 messageConverter
+
+<details>
+  <summary>代码示例</summary>
+
+```java
+/**
+ * @author Aloha
+ * @date 2022/12/5 15:59
+ * @description 自定义HttpMessageConverter
+ */
+public class CustomHttpMessageConverter implements HttpMessageConverter<Person> {
+
+    @Override
+    public boolean canRead(Class clazz, MediaType mediaType) {
+        return false;
+    }
+
+    @Override
+    public boolean canWrite(Class clazz, MediaType mediaType) {
+        return clazz.isAssignableFrom(Person.class);
+    }
+
+    @Override
+    public Person read(Class<? extends Person> clazz, HttpInputMessage inputMessage) throws IOException, HttpMessageNotReadableException {
+        return null;
+    }
+
+    @Override
+    public void write(Person person, MediaType contentType, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
+        //自定义协议数据的输出
+        String data = person.getUserName() + ";" + person.getAge() + ";" +person.getWeight() + ";" +person.getBirth() + ";" +person.getPet() + ";";
+        //将数据写入到响应数据里
+        OutputStream body = outputMessage.getBody();
+        body.write(data.getBytes());
+    }
+
+    /**
+     * @author Aloha
+     * @date 2022/12/5 16:12
+     * @description 内容协商过程服务器要统计所有 MessageConverter 能哪些媒体内容类型
+     * 既使其能支持我们自定义协议类型
+     */
+    @Override
+    public List<MediaType> getSupportedMediaTypes() {
+        return MediaType.parseMediaTypes("application/x-guigu");
+    }
+}
+
+  /**
+   * @author Aloha
+   * @date 2022/12/5 15:32
+   * @description WebMvcConfigurer 定制化SpringMVC 的功能
+   */
+  @Bean
+  public WebMvcConfigurer webMvcConfigurer(){
+    WebMvcConfigurer webMvcConfigurer = new WebMvcConfigurer() {
+      /**
+       * @author Aloha
+       * @date 2022/12/5 16:00
+       * @description img22 img23 扩展MessageConverter 配置，添加自定义MessageConverter，支持自定义协议 [application/x-guigu]
+       */
+      @Override
+      public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
+        CustomHttpMessageConverter httpMessageConverter = new CustomHttpMessageConverter();
+        converters.add(httpMessageConverter);
+        WebMvcConfigurer.super.extendMessageConverters(converters);
+      }
+
+      /**
+       * @author Aloha
+       * @date 2022/12/5 18:35
+       * @description 配置内容协商，修改默认的ParameterContentNegotiationStrategy 媒体类型使其支持自定义协议 [application/x-guigu]
+       */
+      @Override
+      public void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
+          //参考 WebMvcConfigurationSupport.mvcContentNegotiationManager() img24 img25
+          //设置自定义 ParameterContentNegotiationStrategy 支持的媒体类型
+          Map<String, MediaType> mediaTypes = new HashMap<>(4);
+          mediaTypes.put("xml", MediaType.APPLICATION_XML);
+          mediaTypes.put("json", MediaType.APPLICATION_JSON);
+          mediaTypes.put("gg", MediaType.parseMediaType("application/x-guigu"));
+          //指定支持解析哪些参数对应的媒体类型
+          ParameterContentNegotiationStrategy parameterContentNegotiationStrategy = new ParameterContentNegotiationStrategy(mediaTypes);
+          //添加默认的请求头内容协商
+          HeaderContentNegotiationStrategy headerContentNegotiationStrategy = new HeaderContentNegotiationStrategy();
+          configurer.strategies(Arrays.asList(parameterContentNegotiationStrategy,headerContentNegotiationStrategy));
+    
+          WebMvcConfigurer.super.configureContentNegotiation(configurer);
+      }
+    };
+    return webMvcConfigurer;
+  }
+
+  /**
+   * @author Aloha
+   * @date 2022/12/5 12:06
+   * @description
+   *
+   * 1.浏览器发请求直接返回xml [application/xml]  jacksonXmlConverter
+   * 2.如果是ajax请求则返回json [application/json]  jacksonJsonConverter
+   * 3.如果是 硅谷App请求，则返回自定义协议数据  [application/x-guigu]  xxxConverter
+   *
+   * 步骤：
+   * 1.添加自定义 MessageConverter 进入系统内
+   * 2.系统解析请求时就会统计出所有 MessageConverter 能操作哪些类型
+   * 3.根据内容协商规则，在请求参数中 format 指定接收 [application/x-guigu] 类型数据 (属性值1;属性值2;)，并且具备该数据类型解析能力 xxxConverter
+   */
+  @PostMapping("/getPersonForNs")
+  public Person getPersonForNs(@RequestParam String personName, @RequestParam Integer personAge, @RequestParam Date personBirth){
+    Map<String,Object> map = new HashMap<>();
+    Person person = new Person(personName, personAge, "110kg", personBirth, null);
+    return person;
+  }
+```
+</details>
+
+![img_22.png](assets/img_22.png)
+![img_23.png](assets/img_23.png)
+
+> 通过自定义ParameterContentNegotiationStrategy 添加自定义MediaType 类型，使得format参数可实现除了 json/xml 以外的数据类型。
+> 
+> 使得自定义协商协议除了修改请求头中Accept 参数规则外，同时也可在format参数中使用 x-guigu 的自定义协议类型
+
+![img_24.png](assets/img_24.png)
+![img_25.png](assets/img_25.png)
 
 
+# 5.视图解析与模板引擎
+
+## 5.1 视图解析
+> 视图解析：SpringBoot默认不支持 JSP，需要引入第三方模板引擎技术实现页面渲染。freemarker/groovy-templates/thymeleaf
+
+![img_26.png](assets/img_26.png)
+
+### 5.1.1 视图解析原理流程
+
+1. 视图解析原理流程1、目标方法处理的过程中，所有数据都会被放在 ModelAndViewContainer 里面。包括数据和视图地址
+2. 方法的参数是一个自定义类型对象（从请求参数中确定的），把他重新放在 ModelAndViewContainer 
+3. 任何目标方法执行完成以后都会返回 ModelAndView（数据和视图地址）。
+4. processDispatchResult  处理派发结果（页面改如何响应）
+   * render(mv, request, response); 进行页面渲染逻辑
+     * 根据方法的String返回值得到 View 对象 [定义了页面的渲染逻辑]
+       1. 所有的视图解析器尝试是否能根据当前返回值得到View对象
+       2. 得到了  redirect:/main.html --> Thymeleaf new RedirectView()
+       3. ContentNegotiationViewResolver 里面包含了下面所有的视图解析器，内部还是利用下面所有视图解析器得到视图对象。
+       4. view.render(mv.getModelInternal(), request, response);视图对象调用自定义的render进行页面渲染工作
+          1. RedirectView 如何渲染 [重定向到一个页面]
+          2. 获取目标url地址
+          3. response.sendRedirect(encodedURL);
+
+## 5.2 thymeleaf模板引擎
+> https://www.thymeleaf.org/doc/tutorials/3.1/usingthymeleaf.html#standard-expression-syntax
+
+```xml
+<!--thymeleaf语法示例-->
+<table>
+  <thead>
+    <tr>
+      <!--#通配符表示获取到的值，有则填充，无则显示标签默认值-->
+      <th th:text="#{msgs.headers.name}">Name</th>
+      <th th:text="#{msgs.headers.price}">Price</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr th:each="prod: ${allProducts}">
+      <td th:text="${prod.name}">Oranges</td>
+      <td th:text="${#numbers.formatDecimal(prod.price, 1, 2)}">0.99</td>
+    </tr>
+  </tbody>
+</table>
+```
+### 5.2.1 基本语法
+
+#### 5.2.1.1 表达式
+| 表达式名字 | 语法      | 用途  |
+|-------|---------| ---  |
+| 变量取值  | ${...}  | 获取请求域、session域、对象等值 |
+| 选择变量  | *{...}  | 获取上下文对象值 |
+| 消息    | #{...}	 | 获取国际化等值 |
+| 链接    | @{...}	 | 生成链接 |
+| 片段表达式 | ~{...}  | jsp:include 作用，引入公共页面片段 |
+
+#### 5.2.1.2 字面量
+文本值: 'one text' , 'Another one!' ,…数字: 0 , 34 , 3.0 , 12.3 ,…布尔值: true , false
+空值: null
+变量： one，two，.... 变量不能有空格
+
+#### 5.2.1.3 文本操作
+字符串拼接: +
+变量替换: |The name is ${name}|
+
+#### 5.2.1.4 数学运算
+运算符: + , - , * , / , %
+
+#### 5.2.1.5 布尔运算
+运算符:  and , or
+一元运算: ! , not
+
+#### 5.2.1.6 比较运算
+比较: > , < , >= , <= ( gt , lt , ge , le )等式: == , != ( eq , ne )
+
+#### 5.2.1.7 条件运算
+If-then: (if) ? (then)
+If-then-else: (if) ? (then) : (else)
+Default: (value) ?: (defaultvalue)
+
+#### 5.2.1.8 特殊操作
+无操作: _
+
+![img_27.png](assets/img_27.png)
+
+### 5.2.2 thymeleaf使用
+```xml
+<!--thymeleaf 模板视图解析-->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-thymeleaf</artifactId>
+</dependency>
+```
+> SpringBoot 自动配置好了thymeleaf
+
+```java
+@AutoConfiguration(after = { WebMvcAutoConfiguration.class, WebFluxAutoConfiguration.class })
+@EnableConfigurationProperties(ThymeleafProperties.class)
+@ConditionalOnClass({ TemplateMode.class, SpringTemplateEngine.class })
+@Import({ TemplateEngineConfigurations.ReactiveTemplateEngineConfiguration.class,
+		TemplateEngineConfigurations.DefaultTemplateEngineConfiguration.class })
+public class ThymeleafAutoConfiguration {}
+```
+
+自动配好的策略
+1. 所有thymeleaf的配置值都在 ThymeleafProperties
+   * spring.thymeleaf.prefix=classpath:/templates/"  设置thymeleaf模板路径
+     * spring.thymeleaf.suffix=.html  设置thymeleaf模板后缀
+2. 配置好了 SpringTemplateEngine(Spring模板引擎)
+3. 配好了 ThymeleafViewResolver(Thymeleaf视图解析器)
+4. 我们只需要直接开发页面
+
+```java
+	public static final String DEFAULT_PREFIX = "classpath:/templates/";
+
+	public static final String DEFAULT_SUFFIX = ".html";  //xxx.html
+```
 
 
+<details>
+  <summary>代码示例</summary>
 
+```xml
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Thymeleaf 首页</title>
+</head>
+<body>
+<h1 th:text="${title}">Hello</h1>
+<h2>
+    <a href="www.baidu.com" th:text="${linkTitle}">网址名称</a>  <br/>
+    <a href="www.baidu.com" th:href="${link}">qq</a>
+</h2>
+</body>
+</html>
+```
 
-
-
-
+```java
+    @GetMapping("/index-thymeleaf")
+    public String goIndexThymeleaf(Model model){
+        //model中的数据会被放在请求域中 request.setAttribute()
+        model.addAttribute("title", "使用thymeleaf模板");
+        model.addAttribute("linkTitle", "小破站");
+        model.addAttribute("link", "http://www.bilibili.com");
+        //跳转到页面
+        return "index-thymeleaf";
+    }
+```
+</details>

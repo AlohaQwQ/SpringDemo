@@ -124,7 +124,7 @@ import java.lang.reflect.Field;
  *   ○ 支持 HttpMessageConverters （后来我们配合内容协商理解原理）
  * ● Automatic registration of MessageCodesResolver (covered later in this document).
  *   ○ 自动注册 MessageCodesResolver （国际化用）
- * ● Static index.html support.
+ * ● Static index1.html support.
  *   ○ 静态index.html 页支持
  * ● Custom Favicon support (covered later in this document).
  *   ○ 自定义 Favicon

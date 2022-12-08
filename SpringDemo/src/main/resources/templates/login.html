@@ -23,12 +23,14 @@
 
 <div class="container">
 
+    <!--修改action值访问 /login方法-->
     <form class="form-signin" action="index.html" method="post" th:action="@{/login}">
         <div class="form-signin-heading text-center">
             <h1 class="sign-title">Sign In</h1>
             <img src="images/login-logo.png" alt=""/>
         </div>
         <div class="login-wrap">
+           <!-- 获取msg 提示信息-->
             <label style="color: red" th:text="${msg}"></label>
             <input type="text" name="userName" class="form-control" placeholder="User ID" autofocus>
             <input type="password" name="password" class="form-control" placeholder="Password">

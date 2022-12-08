@@ -878,6 +878,7 @@ public class DispatcherServlet extends FrameworkServlet {
     ...
     protected void doDispatch(HttpServletRequest request, HttpServletResponse response) throws Exception {
         HttpServletRequest processedRequest = request;
+        //处理程序执行链，由处理程序对象和任何处理程序拦截器组成。由HandlerMapping的HandlerMapping返回
         HandlerExecutionChain mappedHandler = null;
         boolean multipartRequestParsed = false;
 
@@ -893,6 +894,7 @@ public class DispatcherServlet extends FrameworkServlet {
                 multipartRequestParsed = (processedRequest != request);
 
                 // Determine handler for the current request. 决定当前请求由哪个handler(Controller) 处理
+                // HandlerExecutionChain 中也包含拦截器
                 mappedHandler = getHandler(processedRequest);
                 // HandlerMapping 处理器映射
                 if (mappedHandler == null) {
@@ -913,7 +915,7 @@ public class DispatcherServlet extends FrameworkServlet {
                     }
                 }
 
-
+                //遍历执行 所有已注册拦截器的preHandle方法看是否拦截
                 if (!mappedHandler.applyPreHandle(processedRequest, response)) {
                     return;
                 }
@@ -924,13 +926,38 @@ public class DispatcherServlet extends FrameworkServlet {
                 if (asyncManager.isConcurrentHandlingStarted()) {
                   return;
                 }
-  
+                //如果没有view name则添加默认的view name
                 applyDefaultViewName(processedRequest, mv);
-                //应用注册拦截器的postHandle方法。
+                //倒序遍历执行已注册拦截器的postHandle()方法。
                 mappedHandler.applyPostHandle(processedRequest, response, mv);
             }
-            //处理 处理程序选择和处理程序调用的结果，它要么是ModelAndView，要么是要解析为ModelAndView的异常。
+            //处理程序选择和处理程序调用的结果，它要么是ModelAndView，要么是要解析为ModelAndView的异常。
+            //处理派发请求
             processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
+        }
+        catch (Exception ex) {
+            //执行异常，触发已注册拦截器的afterCompletion()方法
+            triggerAfterCompletion(processedRequest, response, mappedHandler, ex);
+        }
+        catch (Throwable err) {
+            //执行异常，触发已注册拦截器的afterCompletion()方法
+            triggerAfterCompletion(processedRequest, response, mappedHandler,
+                    new NestedServletException("Handler processing failed", err));
+        }
+        finally {
+            if (asyncManager.isConcurrentHandlingStarted()) {
+                // Instead of postHandle and afterCompletion
+                if (mappedHandler != null) {
+                    //倒序遍历执行已注册拦截器的afterCompletion()方法
+                    mappedHandler.applyAfterConcurrentHandlingStarted(processedRequest, response);
+                }
+            }
+            else {
+                // Clean up any resources used by a multipart request.
+                if (multipartRequestParsed) {
+                    cleanupMultipart(processedRequest);
+                }
+            }
         }
     }
 
@@ -939,6 +966,7 @@ public class DispatcherServlet extends FrameworkServlet {
                                      @Nullable Exception exception) throws Exception {
     boolean errorView = false;
 
+    //判断之前解析过程是否有错误
     if (exception != null) {
       if (exception instanceof ModelAndViewDefiningException) {
         logger.debug("ModelAndViewDefiningException encountered", exception);
@@ -989,14 +1017,16 @@ public class DispatcherServlet extends FrameworkServlet {
    */
   protected void render(ModelAndView mv, HttpServletRequest request, HttpServletResponse response) throws Exception {
     // Determine locale for request and apply it to the response.
+    // 确定请求的区域设置并将其应用于响应。  处理国际化
     Locale locale =
             (this.localeResolver != null ? this.localeResolver.resolveLocale(request) : request.getLocale());
     response.setLocale(locale);
 
     View view;
+    //获取view name
     String viewName = mv.getViewName();
     if (viewName != null) {
-      // We need to resolve the view name. 解析view name
+      // We need to resolve the view name. 解析view
       view = resolveViewName(viewName, mv.getModelInternal(), locale, request);
       if (view == null) {
         throw new ServletException("Could not resolve view with name '" + mv.getViewName() +
@@ -1084,8 +1114,9 @@ public class ContentNegotiatingViewResolver extends WebApplicationObjectSupport
         Assert.state(attrs instanceof ServletRequestAttributes, "No current ServletRequestAttributes");
         List<MediaType> requestedMediaTypes = getMediaTypes(((ServletRequestAttributes) attrs).getRequest());
         if (requestedMediaTypes != null) {
+            //获取匹配到的所有视图
             List<View> candidateViews = getCandidateViews(viewName, locale, requestedMediaTypes);
-            //获取视图
+            //筛选最佳视图
             View bestView = getBestView(candidateViews, requestedMediaTypes, attrs);
             if (bestView != null) {
                 return bestView;
@@ -1105,8 +1136,143 @@ public class ContentNegotiatingViewResolver extends WebApplicationObjectSupport
             return null;
         }
     }
+
+  private List<View> getCandidateViews(String viewName, Locale locale, List<MediaType> requestedMediaTypes)
+          throws Exception {
+
+    List<View> candidateViews = new ArrayList<>();
+    if (this.viewResolvers != null) {
+      Assert.state(this.contentNegotiationManager != null, "No ContentNegotiationManager set");
+      for (ViewResolver viewResolver : this.viewResolvers) {
+          //依旧遍历除ContentNegotiatingViewResolver 以外所有viewResolver 看哪个能解析
+          //ThymeleafViewResolver.resolveViewName()
+        View view = viewResolver.resolveViewName(viewName, locale);
+        if (view != null) {
+            //加入候选view 中
+          candidateViews.add(view);
+        }
+        //内容协商过程匹配
+        for (MediaType requestedMediaType : requestedMediaTypes) {
+          List<String> extensions = this.contentNegotiationManager.resolveFileExtensions(requestedMediaType);
+          for (String extension : extensions) {
+            String viewNameWithExtension = viewName + '.' + extension;
+            view = viewResolver.resolveViewName(viewNameWithExtension, locale);
+            if (view != null) {
+              candidateViews.add(view);
+            }
+          }
+        }
+      }
+    }
+    if (!CollectionUtils.isEmpty(this.defaultViews)) {
+      candidateViews.addAll(this.defaultViews);
+    }
+    return candidateViews;
+  }
+
+  @Nullable
+  private View getBestView(List<View> candidateViews, List<MediaType> requestedMediaTypes, RequestAttributes attrs) {
+      for (View candidateView : candidateViews) {
+          if (candidateView instanceof SmartView) {
+              SmartView smartView = (SmartView) candidateView;
+              if (smartView.isRedirectView()) {
+                    return candidateView;
+              }
+          }
+      }
+      for (MediaType mediaType : requestedMediaTypes) {
+          for (View candidateView : candidateViews) {
+            if (StringUtils.hasText(candidateView.getContentType())) {
+                MediaType candidateContentType = MediaType.parseMediaType(candidateView.getContentType());
+                if (mediaType.isCompatibleWith(candidateContentType)) {
+                      mediaType = mediaType.removeQualityValue();
+                      if (logger.isDebugEnabled()) {
+                          logger.debug("Selected '" + mediaType + "' given " + requestedMediaTypes);
+                      }
+                      attrs.setAttribute(View.SELECTED_CONTENT_TYPE, mediaType, RequestAttributes.SCOPE_REQUEST);
+                      return candidateView;
+                  }
+              }
+          }
+      }
+      return null;
+  }
 }
-  
+
+public class ThymeleafViewResolver
+        extends AbstractCachingViewResolver
+        implements Ordered {
+
+  @Override
+  @Nullable
+  public View resolveViewName(String viewName, Locale locale) throws Exception {
+      //判断是否有缓存
+    if (!isCache()) {
+      return createView(viewName, locale);
+    }
+    else {
+      Object cacheKey = getCacheKey(viewName, locale);
+      View view = this.viewAccessCache.get(cacheKey);
+      if (view == null) {
+        synchronized (this.viewCreationCache) {
+          view = this.viewCreationCache.get(cacheKey);
+          if (view == null) {
+            // Ask the subclass to create the View object.
+            view = createView(viewName, locale);
+            if (view == null && this.cacheUnresolved) {
+              view = UNRESOLVED_VIEW;
+            }
+            if (view != null && this.cacheFilter.filter(view, viewName, locale)) {
+              this.viewAccessCache.put(cacheKey, view);
+              this.viewCreationCache.put(cacheKey, view);
+            }
+          }
+        }
+      }
+      else {
+        if (logger.isTraceEnabled()) {
+          logger.trace(formatKey(cacheKey) + "served from cache");
+        }
+      }
+      return (view != UNRESOLVED_VIEW ? view : null);
+    }
+  }
+
+  @Override
+  protected View createView(final String viewName, final Locale locale) throws Exception {
+    // First possible call to check "viewNames": before processing redirects and forwards
+    if (!this.alwaysProcessRedirectAndForward && !canHandle(viewName, locale)) {
+      vrlogger.trace("[THYMELEAF] View \"{}\" cannot be handled by ThymeleafViewResolver. Passing on to the next resolver in the chain.", viewName);
+      return null;
+    }
+    // Process redirects (HTTP redirects) 进程重定向(HTTP重定向)
+    //判断是否是 重定向 redirect:  是则返回RedirectView
+    if (viewName.startsWith(REDIRECT_URL_PREFIX)) {
+      vrlogger.trace("[THYMELEAF] View \"{}\" is a redirect, and will not be handled directly by ThymeleafViewResolver.", viewName);
+      final String redirectUrl = viewName.substring(REDIRECT_URL_PREFIX.length(), viewName.length());
+      final RedirectView view = new RedirectView(redirectUrl, isRedirectContextRelative(), isRedirectHttp10Compatible());
+      return (View) getApplicationContext().getAutowireCapableBeanFactory().initializeBean(view, REDIRECT_URL_PREFIX);
+    }
+    // Process forwards (to JSP resources)
+    //判断是否是转发 forward:   是则返回InternalResourceView
+    if (viewName.startsWith(FORWARD_URL_PREFIX)) {
+      // The "forward:" prefix will actually create a Servlet/JSP view, and that's precisely its aim per the Spring
+      // documentation. See http://docs.spring.io/spring-framework/docs/4.2.4.RELEASE/spring-framework-reference/html/mvc.html#mvc-redirecting-forward-prefix
+      vrlogger.trace("[THYMELEAF] View \"{}\" is a forward, and will not be handled directly by ThymeleafViewResolver.", viewName);
+      final String forwardUrl = viewName.substring(FORWARD_URL_PREFIX.length(), viewName.length());
+      return new InternalResourceView(forwardUrl);
+    }
+    // Second possible call to check "viewNames": after processing redirects and forwards
+    if (this.alwaysProcessRedirectAndForward && !canHandle(viewName, locale)) {
+      vrlogger.trace("[THYMELEAF] View \"{}\" cannot be handled by ThymeleafViewResolver. Passing on to the next resolver in the chain.", viewName);
+      return null;
+    }
+    vrlogger.trace("[THYMELEAF] View {} will be handled by ThymeleafViewResolver and a " +
+            "{} instance will be created for it", viewName, getViewClass().getSimpleName());
+    return loadView(viewName, locale);
+  }
+
+}
   
 ```
 </details>
@@ -1135,7 +1301,7 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
       //创建合并输出模型(合并model中的数据)
       Map<String, Object> mergedModel = createMergedOutputModel(model, request, response);
       prepareResponse(request, response);
-      //合并输出模型
+      //子类view实现该方法，合并输出模型
       renderMergedOutputModel(mergedModel, getRequestToExpose(request), response);
   }
 
@@ -1173,7 +1339,168 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
       return mergedModel;
   }
 
+/**
+ * View that redirects to an absolute, context relative, or current request
+ * relative URL. The URL may be a URI template in which case the URI template
+ * variables will be replaced with values available in the model. By default
+ * all primitive model attributes (or collections thereof) are exposed as HTTP
+ * query parameters (assuming they've not been used as URI template variables),
+ * but this behavior can be changed by overriding the
+ * {@link #isEligibleProperty(String, Object)} method.
+ *
+ * 视图，重定向到绝对URL、上下文相对URL或当前请求相对URL。URL可以是一个URI模板，在这种情况下，
+ * URI模板变量将被替换为模型中可用的值。默认情况下，
+ * 所有基本模型属性(或其集合)都被公开为HTTP查询参数(假设它们没有被用作URI模板变量)，
+ * 但是这种行为可以通过覆盖{@link isEligibleProperty(String, Object)}方法来改变。
+ * 
+ * <p>A URL for this view is supposed to be an HTTP redirect URL, i.e.
+ * suitable for HttpServletResponse's {@code sendRedirect} method, which
+ * is what actually does the redirect if the HTTP 1.0 flag is on, or via sending
+ * back an HTTP 303 code - if the HTTP 1.0 compatibility flag is off.
+ * 
+ * 这个视图的URL应该是一个HTTP重定向URL，即适合HttpServletResponse的{@code sendRedirect}方法，
+ * 如果HTTP 1.0标志是打开的，或者如果HTTP 1.0兼容性标志是关闭的，则通过发回一个HTTP 303代码进行重定向。
+ * 
+ * <p>Note that while the default value for the "contextRelative" flag is off,
+ * you will probably want to almost always set it to true. With the flag off,
+ * URLs starting with "/" are considered relative to the web server root, while
+ * with the flag on, they are considered relative to the web application root.
+ * Since most web applications will never know or care what their context path
+ * actually is, they are much better off setting this flag to true, and submitting
+ * paths which are to be considered relative to the web application root.
+ *
+ * 注意，虽然“contextRelative”标志的默认值是关闭的，但你可能总是想把它设置为true。
+ * 关闭标记时，以“”开头的url被认为是相对于web服务器根，而打开标记时，
+ * 它们被认为是相对于web应用程序根。由于大多数web应用程序永远不会知道或关心它们的上下文路径实际上是什么，
+ * 所以最好将这个标志设置为true，并提交相对于web应用程序根目录的路径。
+ * 
+ * <p><b>NOTE when using this redirect view in a Portlet environment:</b> Make sure
+ * that your controller respects the Portlet {@code sendRedirect} constraints.
+ * 
+ * 说明在Portlet环境中使用此重定向视图时:请确保您的控制器遵守Portlet {@code sendRedirect}约束。
+ * 
+ * @author Rod Johnson
+ * @author Juergen Hoeller
+ * @author Colin Sampaleanu
+ * @author Sam Brannen
+ * @author Arjen Poutsma
+ * @author Rossen Stoyanchev
+ * @see #setContextRelative
+ * @see #setHttp10Compatible
+ * @see #setExposeModelAttributes
+ * @see javax.servlet.http.HttpServletResponse#sendRedirect
+ */
+public class RedirectView extends AbstractUrlBasedView implements SmartView {
+    
   /**
+   * RedirectView 实现
+   * Convert model to request parameters and redirect to the given URL.
+   * 将模型转换为请求参数并重定向到给定的URL。
+   * @see #appendQueryProperties
+   * @see #sendRedirect
+   */
+  @Override
+  protected void renderMergedOutputModel(Map<String, Object> model, HttpServletRequest request,
+                                         HttpServletResponse response) throws IOException {
+    // 创建目标URL，首先检查重定向字符串是否是URI模板，然后使用给定的模型展开它，
+    // 然后可选地将简单类型模型属性作为查询字符串参数
+    // 获取目标url 地址
+    String targetUrl = createTargetUrl(model, request);
+    targetUrl = updateTargetUrl(targetUrl, model, request, response);
+
+    // Save flash attributes
+    // 保存flash属性
+    RequestContextUtils.saveOutputFlashMap(targetUrl, request, response);
+
+    // Redirect 重定向
+    sendRedirect(request, response, targetUrl, this.http10Compatible);
+  }
+
+  /**
+   * Create the target URL by checking if the redirect string is a URI template first,
+   * expanding it with the given model, and then optionally appending simple type model
+   * attributes as query String parameters.
+   * 创建目标URL，首先检查重定向字符串是否是URI模板，
+   * 然后使用给定的模型展开它，然后可选地将简单类型模型属性作为查询字符串参数。
+   */
+  protected final String createTargetUrl(Map<String, Object> model, HttpServletRequest request)
+          throws UnsupportedEncodingException {
+
+    // Prepare target URL.
+    StringBuilder targetUrl = new StringBuilder();
+    String url = getUrl();
+    Assert.state(url != null, "'url' not set");
+
+    if (this.contextRelative && getUrl().startsWith("/")) {
+      // Do not apply context path to relative URLs.
+      targetUrl.append(getContextPath(request));
+    }
+    targetUrl.append(getUrl());
+
+    //设置编码
+    String enc = this.encodingScheme;
+    if (enc == null) {
+      enc = request.getCharacterEncoding();
+    }
+    if (enc == null) {
+      enc = WebUtils.DEFAULT_CHARACTER_ENCODING;
+    }
+
+    if (this.expandUriTemplateVariables && StringUtils.hasText(targetUrl)) {
+      Map<String, String> variables = getCurrentRequestUriVariables(request);
+      targetUrl = replaceUriTemplateVariables(targetUrl.toString(), model, variables, enc);
+    }
+    if (isPropagateQueryProperties()) {
+      appendCurrentQueryParams(targetUrl, request);
+    }
+    //添加重定向数据  xxx.html?key=value&key1=value1
+    if (this.exposeModelAttributes) {
+      appendQueryProperties(targetUrl, model, enc);
+    }
+
+    return targetUrl.toString();
+  }
+
+  /**
+   * Send a redirect back to the HTTP client.
+   * 发送一个重定向回HTTP客户端。
+   * @param request current HTTP request (allows for reacting to request method)
+   * @param response current HTTP response (for sending response headers)
+   * @param targetUrl the target URL to redirect to
+   * @param http10Compatible whether to stay compatible with HTTP 1.0 clients
+   * @throws IOException if thrown by response methods
+   */
+  protected void sendRedirect(HttpServletRequest request, HttpServletResponse response,
+                              String targetUrl, boolean http10Compatible) throws IOException {
+    //url 编码
+    String encodedURL = (isRemoteHost(targetUrl) ? targetUrl : response.encodeRedirectURL(targetUrl));
+    if (http10Compatible) {
+      HttpStatus attributeStatusCode = (HttpStatus) request.getAttribute(View.RESPONSE_STATUS_ATTRIBUTE);
+      if (this.statusCode != null) {
+        response.setStatus(this.statusCode.value());
+        response.setHeader("Location", encodedURL);
+      }
+      else if (attributeStatusCode != null) {
+        response.setStatus(attributeStatusCode.value());
+        response.setHeader("Location", encodedURL);
+      }
+      else {
+        // Send status code 302 by default. 默认情况下发送状态码302。
+        //发送重定向码302 返回客户端
+        response.sendRedirect(encodedURL);
+      }
+    }
+    else {
+      HttpStatus statusCode = getHttp11StatusCode(request, response, targetUrl);
+      response.setStatus(statusCode.value());
+      response.setHeader("Location", encodedURL);
+    }
+  }
+}
+
+  
+  /**
+   * InternalResourceView 实现
    * Render the internal resource given the specified model.
    * This includes setting the model as request attributes.
    * 根据指定的模型呈现内部资源。这包括将模型设置为请求属性。
@@ -1182,16 +1509,17 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
   protected void renderMergedOutputModel(
           Map<String, Object> model, HttpServletRequest request, HttpServletResponse response) throws Exception {
 
-      // Expose the model object as request attributes. 将模型对象公开为请求属性
+      // Expose the model object as request attributes. 将模型对象公开为请求属性(遍历model中的数据填入request请求域中)
       exposeModelAsRequestAttributes(model, request);
   
-      // Expose helpers as request attributes, if any.
+      // Expose helpers as request attributes, if any. 将helper作为请求属性公开(如果有的话)。
       exposeHelpers(request);
   
-      // Determine the path for the request dispatcher.
+      // Determine the path for the request dispatcher. 确定请求分派器的路径。
       String dispatcherPath = prepareForRendering(request, response);
   
       // Obtain a RequestDispatcher for the target resource (typically a JSP).
+      // 获取目标资源(通常是JSP)的RequestDispatcher。
       RequestDispatcher rd = getRequestDispatcher(request, dispatcherPath);
       if (rd == null) {
         throw new ServletException("Could not get RequestDispatcher for [" + getUrl() +
@@ -1199,6 +1527,7 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
       }
   
       // If already included or response already committed, perform include, else forward.
+      // 如果已经包含或响应已经提交，则执行包含，否则转发。
       if (useInclude(request, response)) {
         response.setContentType(getContentType());
         if (logger.isDebugEnabled()) {
@@ -1208,10 +1537,12 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
       }
   
       else {
-        // Note: The forwarded resource is supposed to determine the content type itself.
+          // Note: The forwarded resource is supposed to determine the content type itself.
+          //注意:转发的资源应该决定内容类型本身。
         if (logger.isDebugEnabled()) {
           logger.debug("Forwarding to [" + getUrl() + "]");
         }
+        //转发请求
         rd.forward(request, response);
       }
   }
@@ -1365,7 +1696,7 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
     if (mavContainer.isRequestHandled()) {
       return null;
     }
-    //img9
+    //img9 获取重定向数据 model
     ModelMap model = mavContainer.getModel();
     //转化为ModelAndView
     ModelAndView mav = new ModelAndView(mavContainer.getViewName(), model, mavContainer.getStatus());
@@ -1749,6 +2080,7 @@ public class ViewNameMethodReturnValueHandler implements HandlerMethodReturnValu
 			String viewName = returnValue.toString();
             //设置view 值为string类型
 			mavContainer.setViewName(viewName);
+            //判断是否是重定向
 			if (isRedirectViewName(viewName)) {
 				mavContainer.setRedirectModelScenario(true);
 			}
@@ -2149,16 +2481,17 @@ public class RequestResponseBodyMethodProcessor extends AbstractMessageConverter
         * 利用MappingJackson2HttpMessageConverter将对象转为json再写出去。
 * 请求处理完毕后，执行getModelAndView(mavContainer, modelFactory, webRequest)，处理放在 ModelAndViewContainer 数据视图容器内的数据(Model=数据/View=数据返回地址)
 * (RequestMappingHandlerAdapter) ha.handle(processedRequest, response, mappedHandler.getHandler()) 执行完毕， 返回ModelAndView
-* mappedHandler.applyPostHandle(processedRequest, response, mv) 应用注册拦截器的postHandle方法。
+* mappedHandler.applyPostHandle(processedRequest, response, mv) 倒序执行已注册拦截器的postHandle方法。
 * processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException) 处理派发结果。处理程序选择和处理程序调用的结果，它要么是ModelAndView，要么是要解析为ModelAndView的异常。
+  * [可参考视图解析源码分析总结](#5.1.1)
   * render(mv, request, response); 渲染View
     * resolveViewName(viewName, mv.getModelInternal(), locale, request) 解析view name
     * view.render(mv.getModelInternal(), request, response) 
       * createMergedOutputModel(model, request, response) 创建合并输出模型(合并model中的数据)
       * renderMergedOutputModel(mergedModel, getRequestToExpose(request), response); 合并request/response输出模型，最终输出response 结束
         * exposeModelAsRequestAttributes(model, request); 将model中的数据存入请求域中 request.setAttribute(name, value);
-          
-        
+
+![img_mvc.png](assets/img_mvc.png)  
        
 
 
@@ -2554,6 +2887,8 @@ public class ServletModelAttributeMethodProcessor implements HandlerMethodArgume
     }
 
     // Add resolved attribute and BindingResult at the end of the model
+    //在模型末尾添加解析属性和BindingResult
+    //将请求域Model(Bean 自定义类型请求参数) 数据添加到视图容器defaultModel中
     Map<String, Object> bindingResultModel = bindingResult.getModel();
     mavContainer.removeAttributes(bindingResultModel);
     mavContainer.addAllAttributes(bindingResultModel);
@@ -2860,21 +3195,49 @@ public class CustomHttpMessageConverter implements HttpMessageConverter<Person> 
 
 ![img_26.png](assets/img_26.png)
 
+<a id="5.1.1"></a>
 ### 5.1.1 视图解析原理流程
 
-1. 视图解析原理流程1、目标方法处理的过程中，所有数据都会被放在 ModelAndViewContainer 里面。包括数据和视图地址
-2. 方法的参数是一个自定义类型对象（从请求参数中确定的），把他重新放在 ModelAndViewContainer 
-3. 任何目标方法执行完成以后都会返回 ModelAndView（数据和视图地址）。
-4. processDispatchResult  处理派发结果（页面改如何响应）
-   * render(mv, request, response); 进行页面渲染逻辑
-     * 根据方法的String返回值得到 View 对象 [定义了页面的渲染逻辑]
-       1. 所有的视图解析器尝试是否能根据当前返回值得到View对象
-       2. 得到了  redirect:/main.html --> Thymeleaf new RedirectView()
-       3. ContentNegotiationViewResolver 里面包含了下面所有的视图解析器，内部还是利用下面所有视图解析器得到视图对象。
-       4. view.render(mv.getModelInternal(), request, response);视图对象调用自定义的render进行页面渲染工作
-          1. RedirectView 如何渲染 [重定向到一个页面]
-          2. 获取目标url地址
-          3. response.sendRedirect(encodedURL);
+1. 响应处理过程中，所有数据都会被放在 **ModelAndViewContainer** 里面。包括数据(Model)和视图(View)地址
+2. 若请求方法(如验证用户登录请求/login)的请求参数是一个自定义类型对象(Bean) `img28`，Spring视图解析时会将该参数也设置在 ModelAndViewContainer defaultModel中(ModelAttributeMethodProcessor.resolveArgument()-->mavContainer.addAllAttributes(bindingResultModel))
+3. **RequestMappingHandlerAdapter.handleInternal()->invokeHandlerMethod()** 方法解析请求参数/响应返回值处理后存入到ModelAndViewContainer，再通过getModelAndView() 处理返回 ModelAndView(数据和视图地址)供下一步视图解析
+4. processDispatchResult  处理派发结果(页面该如何响应/视图解析/视图渲染/视图跳转)
+   * render(mv, request, response) 进行页面渲染逻辑
+     * resolveViewName() 根据View name(redirect:/main.html)解析得到 View 对象 [定义了页面的渲染逻辑]
+       1. 所有的视图解析器viewResolvers 遍历尝试是否能根据当前返回值得到View对象 `img29`
+          1. 匹配到 ContentNegotiatingViewResolver.resolveViewName() 内容协商视图解析器 可解析当前view
+             1. getCandidateViews() `img30`依旧遍历除ContentNegotiatingViewResolver 以外所有viewResolver 看哪个能解析
+             2. 匹配到ThymeleafViewResolver.resolveViewName() 解析判断是否是 **redirect:** 重定向，是则创建RedirectView
+             3. 或判断转发 **forward:**，则返回InternalResourceView(forwardUrl)
+             4. 都不满足则创建一个默认的 ThymeleafView(因为引入了Thymeleaf 模板引擎)，如返回字符串"table/basic_table",跳转模板页面
+          2. 得到解析后的view 加入候选中
+          3. ContentNegotiatingViewResolver.getBestView() 筛选最佳视图并返回
+       2. 根据遍历 view name为redirect:/main.html 解析得到 RedirectView(ThymeleafViewResolver解析返回RedirectView)
+       3. view.render(mv.getModelInternal(), request, response) `AbstractView`视图对象调用自定义的render进行页面渲染工作
+          1. createMergedOutputModel(model, request, response) 创建合并输出模型(合并model中的数据)
+          2. renderMergedOutputModel(mergedModel, getRequestToExpose(request), response); 合并request/response输出模型，最终输出response 结束
+             * 由子类`InternalResourceView` `RedirectView` `ThymeleafView` 实现该方法进行视图渲染并合并model数据进行输出 
+               1. RedirectView 渲染过程 [重定向到一个页面]
+                  * createTargetUrl() 获取目标url地址
+                  * response.sendRedirect() 响应发送302 重定向码返回HTTP客户端
+               2. InternalResourceView 渲染过程 [转发请求]
+                  * exposeModelAsRequestAttributes() 将模型对象公开为请求属性(遍历model中的数据填入request请求域中)
+                  * getRequestDispatcher()-->request.getRequestDispatcher(path) 获取请求分发器
+                  * rd.forward(request, response)-->ApplicationDispatcher.forward()-->doForward(request,response) 请求分发器转发请求
+               3. ThymeleafView 渲染过程 [渲染页面片段] 跳转模板页面"table/basic_table"
+                  * renderFragment()方法处理
+                  * 处理合并Model以及request 中的数据
+                  * SpringTemplateEngine 获取模板引擎配置
+                  * viewTemplateEngine.process() 模板引擎执行处理 `img31`
+                  * templateManager.parseAndProcess() 引擎执行输出操作
+                
+
+![img_28.png](assets/img_28.png)
+![img_29.png](assets/img_29.png)
+![img_30.png](assets/img_30.png)
+![img_31.png](assets/img_31.png)
+
+[可参考请求响应源码分析总结](#3.4.2.1)
 
 ## 5.2 thymeleaf模板引擎
 > https://www.thymeleaf.org/doc/tutorials/3.1/usingthymeleaf.html#standard-expression-syntax
@@ -3003,3 +3366,239 @@ public class ThymeleafAutoConfiguration {}
     }
 ```
 </details>
+
+### 5.2.3 构建后台管理系统
+
+#### 5.2.3.1 项目创建
+thymeleaf、web-starter、devtools、lombok
+
+#### 5.2.3.2 静态资源处理
+自动配置好，我们只需要把所有静态资源放到 static 文件夹下
+
+#### 5.2.3.3 路径构建
+th:action="@{/login}"
+
+#### 5.2.3.4 模板抽取
+th:insert/replace/include
+
+#### 5.2.3.5 页面跳转
+<details>
+  <summary>代码示例</summary>
+
+```java
+/**
+     * @author Aloha
+     * @date 2022/12/6 11:31
+     * @description login页面跳转，支持2种路径访问
+     */
+    @GetMapping(value = {"/", "/login"})
+    public String login(){
+
+        //跳转到页面
+        return "login";
+    }
+
+    /**
+     * @author Aloha
+     * @date 2022/12/6 11:32
+     * @description 验证用户登录
+     */
+    @PostMapping("/login")
+    public String login(User user, HttpSession session, Model model){
+        if (StringUtils.hasLength(user.getUserName()) && user.getPassword().equals("123456")) {
+            //将登录成功的用户保存起来
+            session.setAttribute("loginUser", user);
+            //登录成功重定向到 main.html， 重定向是防止表单重复提交的最好方式
+            return "redirect:/main.html";
+        } else {
+            //往请求域中添加 提示信息
+            model.addAttribute("msg", "账号密码错误");
+            return "login";
+        }
+    }
+
+    /**
+     * @author Aloha
+     * @date 2022/12/6 11:52
+     * @description 重定向到main 页面，避免刷新等操作 重复提交 /login请求
+     */
+    @GetMapping("/main.html")
+    public String mainPage(HttpSession session, Model model){
+        //判断是否有登录用户缓存   拦截器/过滤器
+        Object loginUser = session.getAttribute("loginUser");
+        if(loginUser!=null){
+            //登录成功重定向到 main.html
+            return "main";
+        } else {
+            //往请求域中添加 提示信息
+            model.addAttribute("msg","请重新登录");
+            return "login";
+        }
+    }
+```
+</details>
+
+# 6.拦截器
+![img_32.png](assets/img_32.png)
+
+## 6.1 HandlerInterceptor 接口
+1. 编写一个拦截器实现HandlerInterceptor接口
+2. 拦截器注册到容器中(实现WebMvcConfigurer的addInterceptors)
+3. 指定拦截规则 [**如果是拦截所有，静态资源也会被拦截**]
+
+<details>
+  <summary>代码示例</summary>
+
+```java
+    @Bean
+    public WebMvcConfigurer webMvcConfigurer(){
+        WebMvcConfigurer webMvcConfigurer = new WebMvcConfigurer() {
+            
+            /**
+             * @author Aloha
+             * @date 2022/12/7 23:44
+             * @description 添加拦截器
+             */
+            @Override
+            public void addInterceptors(InterceptorRegistry registry) {
+                //添加拦截器并配置拦截路径，排除哪些路径  /** 表示拦截所有请求
+                registry.addInterceptor(new LoginInterceptor())
+                .addPathPatterns("/**") //所有请求都被拦截，包括静态资源
+                .excludePathPatterns("/","/login","/css/**","/font/**","/images/**","/js/**"); //放行的请求
+                WebMvcConfigurer.super.addInterceptors(registry);
+            }
+        };
+        return webMvcConfigurer;
+   }
+
+/**
+ * 登录检查
+ * 1.配置好拦截器要拦截哪些请求
+ * 2.注册拦截器
+ */
+public class LoginInterceptor implements HandlerInterceptor {
+
+    /**
+     * 目标方法执行前
+     */
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        LoggerFactory.getLogger(LoginInterceptor.class).info("————执行前———— {}", request.getRequestURL());
+        //登录逻辑检查
+        HttpSession session = request.getSession();
+        Object loginUser = session.getAttribute("loginUser");
+        if(loginUser==null){
+            //登录拦截
+            //session.setAttribute("msg","登录过期");
+            //重定向到首页
+            //response.sendRedirect("/");
+
+            //使用重定向redirect会导致 request之前放的数据丢失，而使用转发 forward则不会
+            request.setAttribute("msg","登录过期");
+            request.getRequestDispatcher("/").forward(request, response);
+            return false;
+        }
+        return HandlerInterceptor.super.preHandle(request, response, handler);
+    }
+
+    /**
+     * 目标方法执行完成后
+     */
+    @Override
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+        LoggerFactory.getLogger(LoginInterceptor.class).info("————方法执行完毕————{}", request.getRequestURL());
+        HandlerInterceptor.super.postHandle(request, response, handler, modelAndView);
+    }
+
+    /**
+     * 页面渲染完成后
+     */
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+        LoggerFactory.getLogger(LoginInterceptor.class).info("————页面渲染异常————{}", ex!=null? ex.getMessage(): null);
+        LoggerFactory.getLogger(LoginInterceptor.class).info("————页面渲染后————{}", request.getRequestURL());
+        HandlerInterceptor.super.afterCompletion(request, response, handler, ex);
+    }
+}
+```
+</details>
+
+## 6.2 拦截器原理
+1. doDispatch() 请求分发时根据当前请求，找到HandlerExecutionChain 处理程序执行链 [可以处理请求的handler以及handler的所有拦截器 HandlerInterceptor]
+2. mappedHandler.applyPreHandle() 顺序执行已注册的所有拦截器 preHandle()方法 `img33`
+   1. 如果当前拦截器preHandle()返回为true。则执行下一个拦截器的preHandle()
+   2. 如果当前拦截器返回为false, 将triggerAfterCompletion() 倒序执行所有已经执行了preHandle()的拦截器 afterCompletion()
+3. 如果任何一个拦截器返回false, 直接跳出不执行目标方法
+4. 所有拦截器都返回True, 执行目标请求方法
+5. 请求方法执行完毕后，执行 mappedHandler.applyPostHandle()--> 倒序执行拦截器责任链 postHandle() `img34`
+6. 前面的步骤若有执行异常都会触发 triggerAfterCompletion()-->mappedHandler.applyAfterConcurrentHandlingStarted()--> 倒序执行拦截器责任链 afterCompletion()
+7. 页面成功渲染完成,触发 mappedHandler.applyAfterConcurrentHandlingStarted()--> 倒序执行拦截器责任链 afterCompletion()
+
+![img_33.png](assets/img_33.png)
+![img_34.png](assets/img_34.png)
+![img_35.png](assets/img_35.png)
+
+
+# 7.过滤器
+![img_32.png](assets/img_32.png)
+
+## 7.1 HandlerInterceptor 接口
+
+
+
+
+## 7.2 HandlerInterceptor 接口
+
+
+
+
+## 7.3 过滤器与拦截器的区别
+
+
+
+
+# 8.文件上传
+
+
+## 8.1 页面表单
+```xml
+<form method="post" action="/upload" enctype="multipart/form-data">
+    <input type="file" name="file"/>
+    <input type="submit" value="提交"/>
+</form>
+```
+
+
+## 8.2 文件上传
+
+
+
+
+
+
+## 8.3 自动配置原理
+
+
+
+
+# 9.异常处理
+
+
+## 9.1 默认规则
+
+
+
+## 9.2 定制错误处理逻辑
+
+
+
+## 9.3 异常处理自动配置原理
+
+
+
+
+
+
+
+
+

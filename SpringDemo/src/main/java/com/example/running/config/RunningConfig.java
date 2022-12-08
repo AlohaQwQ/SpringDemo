@@ -25,6 +25,7 @@ import org.springframework.web.accept.ParameterContentNegotiationStrategy;
 import org.springframework.web.filter.HiddenHttpMethodFilter;
 import org.springframework.web.servlet.DispatcherServlet;
 import org.springframework.web.servlet.config.annotation.ContentNegotiationConfigurer;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.util.UrlPathHelper;
@@ -211,6 +212,20 @@ public class RunningConfig {
                 configurer.strategies(Arrays.asList(parameterContentNegotiationStrategy,headerContentNegotiationStrategy));
 
                 WebMvcConfigurer.super.configureContentNegotiation(configurer);
+            }
+
+            /**
+             * @author Aloha
+             * @date 2022/12/7 23:44
+             * @description 添加拦截器
+             */
+            @Override
+            public void addInterceptors(InterceptorRegistry registry) {
+                //添加拦截器并配置拦截路径，排除哪些路径  /** 表示拦截所有请求
+                registry.addInterceptor(new LoginInterceptor())
+                        .addPathPatterns("/**") //所有请求都被拦截，包括静态资源
+                        .excludePathPatterns("/","/login","/css/**","/font/**","/images/**","/js/**"); //放行的请求
+                WebMvcConfigurer.super.addInterceptors(registry);
             }
         };
         return webMvcConfigurer;

@@ -9,7 +9,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.web.servlet.ServletComponentScan;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.web.filter.HiddenHttpMethodFilter;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -146,6 +148,7 @@ import java.lang.reflect.Field;
  */
 
 //scanBasePackages-修改包扫描路径
+@ServletComponentScan()
 @SpringBootApplication()
 //@SpringBootConfiguration(proxyBeanMethods = false)
 public class MainApplication {

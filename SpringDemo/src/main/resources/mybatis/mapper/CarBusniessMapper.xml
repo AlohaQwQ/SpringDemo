@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.running.service.mapper.CarBusniessMapper">
+
+    <!--    List<Business> selectAll; -->
+
+    <select id="selectAll" resultType="com.example.running.bean.Business">
+        select * from car_busniess
+    </select>
+</mapper>

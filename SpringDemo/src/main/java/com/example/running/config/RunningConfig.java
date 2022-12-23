@@ -1,13 +1,22 @@
 package com.example.running.config;
 
+import com.alibaba.druid.pool.DruidDataSource;
+import com.alibaba.druid.support.http.StatViewServlet;
+import com.alibaba.druid.support.http.WebStatFilter;
 import com.example.running.annotations.Pet;
+
 import com.example.running.bean.Cat;
 import com.example.running.bean.Dog;
 import com.example.running.bean.Zhouzhou;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcRegistrations;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.boot.web.servlet.ServletListenerRegistrationBean;
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -28,9 +37,14 @@ import org.springframework.web.servlet.config.annotation.ContentNegotiationConfi
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.springframework.web.util.UrlPathHelper;
 import org.yaml.snakeyaml.LoaderOptions;
 
+import javax.sql.DataSource;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -66,8 +80,8 @@ public class RunningConfig {
      * @Bean 注册的对象都为单实例，无论被调用多少次
      * @ConditionalOnBean 当容器中有指定bean 组件时，本注入才生效
      **/
-//    @ConditionalOnBean(value = Cat.class)
-//    @Bean
+    @ConditionalOnBean(value = Cat.class)
+    @Bean
     public Zhouzhou zhouzhou(){
         Zhouzhou zhouzhou = new Zhouzhou();
         zhouzhou.setCat(cat());
@@ -84,7 +98,7 @@ public class RunningConfig {
     }
 
 
-//    @Bean
+    @Bean
     public Dog dog(){
         return new Dog();
     }
@@ -99,6 +113,32 @@ public class RunningConfig {
         methodFilter.setMethodParam("_m");
         return methodFilter;
     }
+
+
+    /**
+     * @author Aloha
+     * @date 2022/12/13 23:27
+     * @description 使用Spring Bean的方式注入 ServletRegistrationBean/FilterRegistrationBean/ServletListenerRegistrationBean
+     */
+    /*@Bean
+    public ServletRegistrationBean servletRegistrationBean(){
+        MyServlet myServlet = new MyServlet();
+        return new ServletRegistrationBean(myServlet, "/my");
+    }
+
+    @Bean
+    public FilterRegistrationBean filterRegistrationBean(){
+        LoginFilter loginFilter = new LoginFilter();
+        FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean(loginFilter);
+        filterRegistrationBean.setUrlPatterns(Arrays.asList("/my","/my02"));
+        return filterRegistrationBean;
+    }
+
+    @Bean
+    public ServletListenerRegistrationBean servletListenerRegistrationBean(){
+        MyServletContextListener myServletContextListener = new MyServletContextListener();
+        return new ServletListenerRegistrationBean(myServletContextListener);
+    }*/
 
     /**
      * @author Aloha
@@ -230,5 +270,50 @@ public class RunningConfig {
         };
         return webMvcConfigurer;
     }
+
+    /**
+     * @author Aloha
+     * @date 2022/12/21 16:12
+     * @description 将配置属性与对象绑定
+     */
+    /*@ConfigurationProperties("spring.datasource")
+    @Bean
+    public DataSource dataSource() throws SQLException {
+        DruidDataSource druidDataSource = new DruidDataSource();
+        String url = druidDataSource.getUrl();
+        String userName = druidDataSource.getUsername();
+        //加入防火墙，监控功能
+        druidDataSource.setFilters("wall,stat");
+        return druidDataSource;
+    }
+
+    *//**
+     * @author Aloha
+     * @date 2022/12/19 1:05
+     * @description 使用Servlet 注册的方式 配置druid 的监控功能
+     *//*
+    @Bean
+    public ServletRegistrationBean starServlet(){
+        StatViewServlet statViewServlet = new StatViewServlet();
+        ServletRegistrationBean<StatViewServlet> servletRegistrationBean = new ServletRegistrationBean(statViewServlet, "/druid/*");
+        //配置登录账号
+        servletRegistrationBean.addInitParameter("loginUsername", "druid");
+        servletRegistrationBean.addInitParameter("loginPassword", "123456");
+        return servletRegistrationBean;
+    }
+
+    *//**
+     * @author Aloha
+     * @date 2022/12/19 1:05
+     * @description 使用Servlet 注册的方式 配置druid 的监控功能, WebStatFilter 用于采集web-jdbc 关联监控的功能
+     *//*
+    @Bean
+    public FilterRegistrationBean webStatFilter(){
+        WebStatFilter webStatFilter = new WebStatFilter();
+        FilterRegistrationBean<WebStatFilter> filterRegistrationBean = new FilterRegistrationBean(webStatFilter);
+        filterRegistrationBean.setUrlPatterns(Arrays.asList("/*"));
+        filterRegistrationBean.addInitParameter("exclusions", "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*");
+        return filterRegistrationBean;
+    }*/
 
 }

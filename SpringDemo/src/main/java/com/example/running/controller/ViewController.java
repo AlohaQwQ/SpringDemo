@@ -1,6 +1,7 @@
 package com.example.running.controller;
 
 import com.example.running.annotations.User;
+import com.example.running.exception.UserTooManyException;
 import com.sun.org.apache.xpath.internal.operations.Mod;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -112,6 +113,11 @@ public class ViewController {
                 new User("user3", "333"),
                 new User("user4", "444"));
         model.addAttribute("users", userList);
+
+        if(userList.size()>3){
+            throw new UserTooManyException("炸了");
+        }
+
         return "table/dynamic_table";
     }
 
@@ -133,5 +139,10 @@ public class ViewController {
         return "table/responsive_table";
     }
 
+    @GetMapping("/form_layouts")
+    public String formLayouts(){
+        //登录成功重定向到 main.html
+        return "form/form_layouts";
+    }
 
 }

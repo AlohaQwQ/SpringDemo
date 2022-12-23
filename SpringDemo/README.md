@@ -180,7 +180,7 @@ public class AopAutoConfiguration {
 }
 ```
 
-> 总结：https://spring.io/projects/spring-boot
+> 总结：https://spring.io/projects/spring-boot      https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle
 
 * SpringBoot先加载所有的自动配置类  xxxxxAutoConfiguration
   + org\springframework\boot\spring-boot\2.7.1\spring-boot-2.7.1.jar!\META-INF\spring.factories
@@ -891,6 +891,7 @@ public class DispatcherServlet extends FrameworkServlet {
             try {
                 //检测是否是文件请求
                 processedRequest = checkMultipart(request);
+                //判断request 是否被改变，是则为文件上传请求
                 multipartRequestParsed = (processedRequest != request);
 
                 // Determine handler for the current request. 决定当前请求由哪个handler(Controller) 处理
@@ -974,6 +975,7 @@ public class DispatcherServlet extends FrameworkServlet {
       }
       else {
         Object handler = (mappedHandler != null ? mappedHandler.getHandler() : null);
+        //处理异常，通过注册的HandlerExceptionResolvers确定错误ModelAndView
         mv = processHandlerException(request, response, handler, exception);
         errorView = (mv != null);
       }
@@ -3540,25 +3542,94 @@ public class LoginInterceptor implements HandlerInterceptor {
 
 
 # 7.过滤器
-![img_32.png](assets/img_32.png)
+![img_filter.png](assets/img_filter.png)
+> Spring 中不能处理用户请求，但可以用来提供过滤作用的一种Servlet规范。在请求进入容器之后，
+> 还未进入Servlet之前进行预处理，并且在请求结束返回给前端这之间进行后期处理。
+> 具体则是通过截取用户端的请求与响应信息，并对之进行过滤，
+> 即在Servlet被调用之前检查Request对象，
+> 修改Request Header和Request内容；在Servlet被调用之后检查Response对象，修改Response Header和Response内容。
 
-## 7.1 HandlerInterceptor 接口
+`常用场景有:登陆过滤, 日志记录, 权限控制等`
 
+<a id="7.1"></a>
+## 7.1 Filter 接口
+![img_36.png](assets/img_36.png)
 
+## 7.2 过滤器实现
+1. 编写一个过滤器实现Filter接口
+2. 使用@WebFilter 注解，Spring启动时将把该过滤器注册到容器中
+3. urlPatterns 指定拦截规则 [**如果是拦截所有/*，静态资源也会被拦截**]
 
+<details>
+  <summary>代码示例</summary>
 
-## 7.2 HandlerInterceptor 接口
+```java
+@WebFilter(urlPatterns = "/*", filterName = "LoginFilter")
+public class LoginFilter implements Filter {
 
+    private Logger logger = LoggerFactory.getLogger(LoginFilter.class);
 
+    //添加排除路径
+    private Set<String> excludePatterns = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList("/", "/login")));
 
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {
+        logger.info("[ {} ] 登录过滤器初始化", this.getClass().getSimpleName());
+        Filter.super.init(filterConfig);
+    }
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        logger.info("[ {} ] 执行", this.getClass().getSimpleName());
+        //登录逻辑检查
+        HttpServletRequest httpRequest = ((HttpServletRequest)request);
+        HttpSession session = httpRequest.getSession();
+        //获取当前请求路径信息
+        String requestURI = httpRequest.getRequestURI();
+        //匹配路径是否放行
+        if(excludePatterns.contains(requestURI)){
+            chain.doFilter(request, response);
+            return;
+        }
+
+        Object loginUser = session.getAttribute("loginUser");
+        if(loginUser==null){
+            //登录拦截
+            request.setAttribute("msg","登录过期");
+            request.getRequestDispatcher("/").forward(request, response);
+            return;
+        }
+        chain.doFilter(request, response);
+    }
+
+    @Override
+    public void destroy() {
+        logger.info("[ {} ] 摧毁", this.getClass().getSimpleName());
+        Filter.super.destroy();
+    }
+}
+```
+</details>
 
 ## 7.3 过滤器与拦截器的区别
+1. 实现原理不同: 过滤器是基于函数回调,拦截器是基于java的反射机制的。
+2. 使用范围不同: 过滤器依赖与servlet容器，拦截器不依赖servlet容器（拦截器是Spring容器内的，是Spring框架支持的）。
+   * 因为Filter是Servlet规范中规定的，所有只能用于Web中；而拦截器既可以用于Web，也可以用于Application、Swing中。
+3. 触发时机不同: 过滤器是在请求进入tomcat容器后，但请求进入servlet之前进行预处理的；请求结束返回也是，是在servlet处理完后，返回给前端之前。
+    * 拦截器可以深入到方法的前后、异常抛出前后等更深层次的程度作处理（这里也在一定程度上论证了拦截器是利用java的反射机制实现的），所以在Spring框架中，优先使用拦截器。
+4. 拦截的请求范围不同: 过滤器则可以对几乎所有的请求起作用；拦截器只能对action请求起作用。
+5. 注入Bean情况不同: 拦截器先于ApplicationContext加载，所以拦截器无法注入Spring容器管理的bean。
+    * 解决办法：拦截器不使用@Component加载，改为使用@Configuration+@Bean加载。
+6. 控制执行顺序不同：过滤器用@Order注解控制执行顺序，通过@Order控制过滤器的级别，值越小级别越高越先执行；拦截器默认的执行顺序，就是它的注册顺序，也可以通过@Order手动设置控制，值越小越先执行。
+    * 注意：拦截器有前置处理和后置处理，前置处理越先，后置处理就越后。
 
+![img_37.png](assets/img_37.png)
 
-
+## 7.4 过滤器和拦截器执行顺序图
+![img_interceptor.png](assets/img_interceptor.png)
 
 # 8.文件上传
-
 
 ## 8.1 页面表单
 ```xml
@@ -3568,32 +3639,647 @@ public class LoginInterceptor implements HandlerInterceptor {
 </form>
 ```
 
-
 ## 8.2 文件上传
+<details>
+  <summary>代码示例</summary>
 
+```java
+    /**
+     * @description MultipartFile 自动封装上传过来的文件
+     */
+    @PostMapping("/upload")
+    public String uploadFile(@RequestParam String email, @RequestParam String username,
+                             @RequestPart("headerImg") MultipartFile uploadFile,  MultipartFile[] photos) throws IOException {
+        //获取项目编译路径
+        String path = ClassUtils.getDefaultClassLoader().getResource("").getPath();
+        String filePath = path + "static" + File.separator;
+        String format = new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss").format(new Date());
 
-
-
-
+        if(!uploadFile.isEmpty()){
+            //为文件命名增加随机码和时间戳
+            String originalFilename = format + "-" + UUID.randomUUID() + "-" + uploadFile.getOriginalFilename();
+            File file = new File(filePath + originalFilename);
+            uploadFile.transferTo(file);
+        }
+        return "main";
+    }
+```
+</details>
 
 ## 8.3 自动配置原理
+文件上传自动配置类-MultipartAutoConfiguration-MultipartProperties `img38`
+1. 自动配置好了 StandardServletMultipartResolver  [标准Servlet文件上传解析器]
+2. 原理步骤
+ * doDispatch()->checkMultipart() 检测是否是文件上传请求
+   * checkMultipart() `img39`使用文件上传解析器isMultipart()判断
+   * 解析器封装原生request multipartResolver.resolveMultipart()，解析文件流parseRequest()包装成Part，返回StandardMultipartHttpServletRequest 文件上传请求
+ * RequestPartMethodArgumentResolver 参数解析器来解析注解 @RequestPart，将之前已经封装好的文件内容，根据参数名返回 MultipartFile
+   * 将request中文件信息封装为一个Map(MultiValueMap<String, MultipartFile>)-> MultipartHttpServletRequest.getMultipartFiles().get("key"")
 
-
-
+![img_38.png](assets/img_38.png)
+![img_39.png](assets/img_39.png)
 
 # 9.异常处理
-
+![img_40.png](assets/img_40.png)
 
 ## 9.1 默认规则
+* 默认情况下，Spring Boot提供`/error`处理所有错误的映射
+* 对于机器客户端，它将生成JSON响应，其中包含错误，HTTP状态和异常消息的详细信息 `img41`
+* 对于浏览器客户端，响应一个 `whitelabel`错误视图，以HTML格式呈现相同的数据
+* 要对其进行自定义，添加`View`解析为`error`
+* 要完全替换默认行为，可以实现`ErrorController`并注册该类型的Bean定义，或添加`ErrorAttributes`类型的组件以使用现有机制但替换其内容。
+* /error/下的4xx，5xx 等错误页面会被自动解析 `img42`
+
+![img_41.png](assets/img_41.png)
+![img_42.png](assets/img_42.png)
+
+## 9.2 异常处理自动配置原理
+> ErrorMvcAutoConfiguration 自动配置异常处理规则
+1. 容器中的组件: 类型：默认错误属性 `DefaultErrorAttributes` -> id: errorAttributes(方法名即为id)
+   * public class DefaultErrorAttributes implements ErrorAttributes, HandlerExceptionResolver {}
+   * DefaultErrorAttributes: 定义错误页面中可以包含哪些数据(exception/trace/message/errors) `img45`
+2. 容器中的组件: 类型：`BasicErrorController` -> id：basicErrorController (负责响应/error 请求, 并返回对应响应内容 json/error页面)
+   * ${server.error.path:${error.path:/error} 读取配置为server.error.path 的值作为请求路径，无配置则默认为 /error
+   * errorHtml() 响应返回错误html页面 -> ModelAndView("error", model)
+     * 可自定义 /error 请求，返回自定义错误页面
+   * error() 响应返回responseBody(json)数据 -> ResponseEntity<Map<String, Object>> 
+   * 容器中有组件 View->id是error`ErrorView` （响应默认错误页）
+   * 容器中放组件 `BeanNameViewResolver`(视图解析器), 避免被遗漏添加而无法来解析ErrorView(按照返回的视图名作为组件的id去容器中找View对象)
+3. 容器中的组件: 类型: `DefaultErrorViewResolver` -> id：conventionErrorViewResolver `img44`
+   * 如果发生错误，会以HTTP的状态码(404/500) 作为viewName(视图页地址)，找到真正的页面(404.html/500.html)
+   * error/404、5xx.html
+
+
+![img_43.png](assets/img_43.png)
+![img_44.png](assets/img_44.png)
+![img_45.png](assets/img_45.png)
+
+## 9.3 异常处理步骤流程
+1. doDispatch() 请求方法运行期间有任何异常(Exception/Throwable)都会被catch，转化为 dispatchException， 并且调用请求完成方法 webRequest.requestCompleted()
+2. 无论报错与否，都会进入视图解析流程(页面渲染) `processDispatchResult()` `img46`
+   * processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException)
+3. processHandlerException() 处理请求过程中发生的异常，通过注册的HandlerExceptionResolvers确定错误ModelAndView  `img47`
+   * 遍历所有的 handlerExceptionResolvers `img49`，看谁能处理当前异常 [HandlerExceptionResolver处理器异常解析器] `img48`
+     * DefaultErrorAttributes先来处理异常，把异常信息保存到request域(storeErrorAttributes(request, ex)),并且返回null
+     * 遍历结果没有resolver 能处理异常，抛出异常被 doDispatch() 方法最外层被捕获
+       * 异常捕获里执行 triggerAfterCompletion(processedRequest, response, mappedHandler, ex)，依旧无法处理异常
+       * 如果没有任何逻辑能处理这个异常，则Spring 底层就会发送/error请求，重新进去 doDispatch()方法进行处理
+       * 匹配到底层的`BasicErrorController` 进行处理
+       * errorHtml()->resolveErrorView() 解析错误视图；遍历所有的 ErrorViewResolver 匹配解析
+       * 匹配到`ErrorMvcAutoConfiguration` 自动配置的默认的 DefaultErrorViewResolver, 结合响应状态码等响应错误页的地址-> error/500.html 
+       * 模板引擎最终响应对应的状态码页面 error/500.html  error/404.html
+
+![img_46.png](assets/img_46.png)
+![img_47.png](assets/img_47.png)
+![img_48.png](assets/img_48.png)
+![img_49.png](assets/img_49.png)
+
+
+## 9.4 定制错误处理逻辑
+1. 自定义错误页
+    * error/404.html   error/5xx.html；有精确的错误状态码页面就匹配精确，没有就找 4xx.html；如果都没有就触发白页
+2. `@ControllerAdvice` + `@ExceptionHandler` 处理全局异常, 通过配置捕获异常类型，异常处理时 `ExceptionHandlerExceptionResolver` 会自动匹配异常处理逻辑
+3. `@ResponseStatus` + 自定义异常, 底层是 `ResponseStatusExceptionResolver`, `img51` 把 `@Responsestatus` 注解的信息组装成MV(无效mv)，再调用 response.sendError(statusCode, resolvedReason)向服务器发送响应，最后由tomcat 服务器处理 /error请求，再次执行 /error解析
+4. Spring底层的异常，如 MissingServletRequestParameterException(缺少请求参数异常), `DefaultHandlerExceptionResolver` 负责处理框架底层的异常 `img52`
+    * 底层处理发送response.sendError(), 由tomcat 服务器处理 /error请求  `img_tomcat_error`
+5. 自定义实现 HandlerExceptionResolver 处理异常, 可以作为默认的全局异常处理规则
+6. ErrorViewResolver 实现自定义处理异常(/error请求)
+    * response.sendError, /error请求就会转给controller
+    * 异常没有解析器能处理, response.sendError->tomcat, /error请求就会转给controller
+    * BasicErrorController 接收/error请求处理， 最后由ErrorViewResolver 解析 ModelAndView
+
+<details>
+  <summary>代码示例</summary>
+
+```java
+@ControllerAdvice
+public class GlobalExceptionHandler {
+
+    private Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /**
+     * @author Aloha
+     * @date 2022/12/13 15:56
+     * @description ExceptionHandler 指定处理异常数组, 返回 ModelAndView 或 viewname
+     */
+    @ExceptionHandler({ArithmeticException.class, NullPointerException.class})
+    public String handlerException(Exception e){
+        logger.info("自定义异常捕获:{}", e.getMessage());
+        //返回视图地址
+        return "login";
+    }
+}
+
+@ResponseStatus(value = HttpStatus.FORBIDDEN, reason = "用户太多")
+public class UserTooManyException extends RuntimeException{
+
+    public UserTooManyException() {}
+
+    public UserTooManyException(String message) {
+        super(message);
+    }
+}
+
+@Order(Ordered.HIGHEST_PRECEDENCE)
+@Component
+public class CustomHandlerExceptionResolver implements HandlerExceptionResolver {
+
+    private Logger logger = LoggerFactory.getLogger(CustomHandlerExceptionResolver.class);
+
+    @Override
+    public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        logger.info("自定义异常解析:{}", ex.toString());
+        try {
+            response.sendError(666, "服务器炸了");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return new ModelAndView();
+    }
+}
+
+```
+</details>
+
+![img_51.png](assets/img_51.png)
+![img_52.png](assets/img_52.png)
+![img_tomcat_error.png](assets/img_tomcat_error.png)
+
+# 10.Web原生组件注入（Servlet、Filter、Listener）
+![img_53.png](assets/img_53.png)
+
+## 10.1 使用注解注入
+* @WebServlet(urlPatterns = "/my") `img55`
+  * 继承`HttpServlet`， 配置`urlPatterns` 过滤url路径和 `@ServletComponentScan` 注解
+  * @SpringBootApplication()->@ServletComponentScan() 配置Servlet 组件扫描路径 `img54`
+  * 效果：直接响应，没有经过Spring的拦截器？
+* @WebFilter() [详见过滤器实现](#7.1)
+* @WebListener 
+  * ContextListener implements ServletContextListener{} 可实现监听Servlet 初始化和销毁事件
+
+![img_55.png](assets/img_55.png)
+![img_54.png](assets/img_54.png)
+
+## 10.2 使用Spring Bean注入
+* ServletRegistrationBean
+* FilterRegistrationBean
+* ServletListenerRegistrationBean
+
+```java
+    @Bean
+    public ServletRegistrationBean servletRegistrationBean(){
+        MyServlet myServlet = new MyServlet();
+        return new ServletRegistrationBean(myServlet, "/my");
+    }
+
+    @Bean
+    public FilterRegistrationBean filterRegistrationBean(){
+        LoginFilter loginFilter = new LoginFilter();
+        FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean(loginFilter);
+        filterRegistrationBean.setUrlPatterns(Arrays.asList("/my","/my02"));
+        return filterRegistrationBean;
+    }
+
+    @Bean
+    public ServletListenerRegistrationBean servletListenerRegistrationBean(){
+        MyServletContextListener myServletContextListener = new MyServletContextListener();
+        return new ServletListenerRegistrationBean(myServletContextListener);
+    }
+```
+
+## 10.3 自定义的Servlet 为什么没有经过之前定义的 登录拦截器(LoginInterceptor)
+> 扩展: DispatchServlet注册流程 `img57`
+* `DispatcherServletAutoConfiguration` -> `DispatcherServletConfiguration` -> `DispatcherServletRegistrationConfiguration`
+* 通过自动配置注册了`DispatcherServlet`, 并通过注入`DispatcherServletRegistrationBean` 传入之前配置的Servlet实现注册
+* 容器中自动配置了 DispatcherServlet, 读取WebMvcProperties 配置并绑定到属性, 对应的配置文件配置项是`spring.mvc`
+  * 通过ServletRegistrationBean<DispatcherServlet> 把之前配置DispatcherServlet 注册到Spring中
+* WebMvcProperties 中默认配置path 是 /, 即默认映射的是 / 路径
+
+> 机制 使用Tomcat开发Servlet时，如果多个Servlet都能处理到同一层路径(/)，则以精确优先原则处理
+访问/my 路径下请求，依据Tomcat 优先匹配逻辑会由B Servlet来处理
+A Servlet: /my/
+B Servlet: /my/1
+
+![img_56.png](assets/img_56.png)
+![img_57.png](assets/img_57.png)
+
+## 10.4 嵌入式Servlet容器
+![img_58.png](assets/img_58.png)
+![img_59.png](assets/img_59.png)
+
+### 10.4.1 Spring 嵌入式Servlet
+> Spring 嵌入式Servlet原理
+* SpringBoot应用启动发现当前是Web应用, 配置了web-starter 依赖包(内置了tomcat)
+* Web应用会创建一个Web版的ioc容器`ServletWebServerApplicationContext`
+* `ServletWebServerApplicationContext` 启动的时候寻找`ServletWebServerFactory`(Servlet 的web服务器工厂-> Servlet 的web服务器), 只允许配置一个web服务器
+* SpringBoot底层默认有很多的WebServer工厂, `TomcatServletWebServerFactory`, `JettyServletWebServerFactory`, `UndertowServletWebServerFactory`
+* 底层直接会有一个自动配置类 `ServletWebServerFactoryAutoConfiguration`
+* `ServletWebServerFactoryAutoConfiguration` 导入了`ServletWebServerFactoryConfiguration` (工厂配置类)
+* `ServletWebServerFactoryConfiguration` 配置类`img60` 根据动态判断系统中导入的Web服务器的包 (默认是web-starter中已导入tomcat包) 来创建工厂, 容器中就有 `TomcatServletWebServerFactory`
+* `TomcatServletWebServerFactory` 创建了Tomcat服务器类对象, 并配置服务器属性启动, `img61` TomcatWebServer 的构造器拥有初始化方法initialize->this.tomcat.start() 启动了tomcat服务器
+* 内嵌服务器，本质上就是创建了Tomcat服务器类对象, 手动把启动服务器的代码调用(Tomcat核心jar包存在), 区别于双击启动Tomcat服务器(tomcat-start.exe)
+
+![img_60.png](assets/img_60.png)
+![img_61.png](assets/img_61.png)
+
+### 10.4.2 切换嵌入式Servlet容器
+* 默认支持的webServer
+    * Tomcat, Jetty, or Undertow
+    * ServletWebServerApplicationContext 容器启动寻找ServletWebServerFactory 并引导创建服务器
+* 切换服务器 `img62`
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+    <exclusions>
+        <!-- 移除web tomcat依赖 -->
+        <exclusion>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-tomcat</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+
+ <!--切换嵌入式服务器jetty/undertow-->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-jetty</artifactId>
+</dependency>
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-undertow</artifactId>
+</dependency>
+
+```
+
+![img_62.png](assets/img_62.png)
+
+### 10.4.3 定制Servlet容器
+* 修改配置文件`ServerProperties`-> server.tomcat.xxx 
+* 直接自定义 ConfigurableServletWebServerFactory `img63`
+* 实现定制化器 `WebServerFactoryCustomizer<ConfigurableServletWebServerFactory>`  `img63`
+   * 把配置文件的值和`ServletWebServerFactory` 进行绑定
+   * xxxxxCustomizer(定制化器), 可以改变xxxx的默认规则
+
+![img_63.png](assets/img_63.png)
+
+# 11.定制化原理
+![img_64.png](assets/img_64.png)
+
+## 11.1 定制化的常见方式 
+> 原理分析:**场景starter**->xxxxAutoConfiguration(自动配置)->导入xxx组件(@Bean)->绑定xxxProperties(属性配置)->**绑定配置文件项**
+
+* 根据xxxProperties 属性配置类来修改相应属性
+* Web应用编写一个配置类 `@Configuration` 实现 `WebMvcConfigurer` 即可定制化web功能, 通过注入 @Bean 给容器中再扩展一些组件
+* xxxxxCustomizer 定制化类
+* 编写自定义的配置类-> xxxConfiguration+ @Bean替换, 增加容器中默认组件, 视图解析器
+
+## 11.2 完全控制Spring MVC
+
+* @EnableWebMvc + WebMvcConfigurer-> 注入@Bean, 可实现全面接管SpringMVC，所有规则全部自己重新配置, 实现定制和扩展功能
+* 原理
+1. `WebMvcAutoConfiguration` 默认的SpringMVC的自动配置功能类。静态资源、欢迎页.....
+2. 一旦使用 `@EnableWebMvc` 会导入 `@Import(DelegatingWebMvcConfiguration.class)`
+3. `DelegatingWebMvcConfiguration` 的作用，只保证SpringMVC最基本的使用
+   * 把所有系统中的 `WebMvcConfigurer` 进行注册生效, 所有功能的定制都是这些 `WebMvcConfigurer` 合起来一起生效
+   * 自动配置了一些非常底层的组件, `RequestMappingHandlerMapping` 等依赖的组件都是从容器中获取
+   * public class DelegatingWebMvcConfiguration extends WebMvcConfigurationSupport {}
+4. `WebMvcAutoConfiguration` 里面的配置要能生效必须 `@ConditionalOnMissingBean(WebMvcConfigurationSupport.class)`
+5. `@EnableWebMvc` 导致了 `WebMvcAutoConfiguration`  没有生效。
 
 
 
-## 9.2 定制错误处理逻辑
+# 12.数据访问
+![img_65.png](assets/img_65.png)
+
+## 11.1 SQL
+### 11.1.1 数据源的自动配置-HikariDataSource
+> 导入JDBC场景
+```xml
+<!--jdbc连接依赖-->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-jdbc</artifactId>
+</dependency>
+
+<!--mysql 驱动依赖-->
+<!-- https://mvnrepository.com/artifact/mysql/mysql-connector-java -->
+<dependency>
+    <groupId>mysql</groupId>
+    <artifactId>mysql-connector-java</artifactId>
+</dependency>
+```
+
+`数据库版本需和驱动版本对应`
+![img_67.png](assets/img_67.png)
+
+```xml
+默认版本：<mysql.version>8.0.29</mysql.version>
+
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+<!--            <version>5.1.49</version>-->
+        </dependency>
+想要修改版本
+1. 直接依赖引入具体版本(maven的就近依赖原则)-><version>
+2. 修改pom mysql默认依赖版本->${mysql.version}
+<properties>
+    <java.version>1.8</java.version>
+    <mysql.version>5.1.49</mysql.version>
+</properties>
+```
+
+### 11.1.2 分析自动配置
+* `DataSourceAutoConfiguration`: 数据源的自动配置
+  * `DataSourceProperties` 修改数据源相关的配置: spring.datasource
+  * 数据库连接池的配置 `PooledDataSourceCondition` `img68`, 是当容器中没有DataSource才会自动配置的
+  * 底层配置好的数据源连接池是: `HikariDataSource`
+* `DataSourceTransactionManagerAutoConfiguration`: 事务管理器的自动配置
+* `JdbcTemplateAutoConfiguration`: JdbcTemplate的自动配置, 可以来对数据库进行crud
+  * 可以修改这个配置项 `JdbcProperties` @ConfigurationProperties(prefix = "spring.jdbc") 来修改JdbcTemplate
+  * `JdbcTemplateConfiguration` @Bean @Primary  注入了 JdbcTemplate 对象
+* `JndiDataSourceAutoConfiguration`: jndi的自动配置
+* `XADataSourceAutoConfiguration`: 分布式事务相关的
+
+![img_68.png](assets/img_68.png)
+
+### 11.1.3 修改配置项
+```text
+#数据库连接配置
+spring.datasource.url=jdbc:mysql://localhost:3306/study_db
+spring.datasource.username=root
+spring.datasource.password=123456
+```
+![img_69.png](assets/img_69.png)
+
+
+## 11.2 使用Druid数据源
+> druid官方github地址 https://github.com/alibaba/druid
+> https://github.com/alibaba/druid/tree/master/druid-spring-boot-starter
+
+### 11.2.1 整合第三方技术的两种方式
+* 自定义
+* 找starter
+
+### 11.2.2 自定义
+### 11.2.2.1 创建数据源
+```xml
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>druid</artifactId>
+    <version>1.1.17</version>
+</dependency>
+<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource"
+		destroy-method="close">
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
+		<property name="maxActive" value="20" />
+		<property name="initialSize" value="1" />
+		<property name="maxWait" value="60000" />
+		<property name="minIdle" value="1" />
+		<property name="timeBetweenEvictionRunsMillis" value="60000" />
+		<property name="minEvictableIdleTimeMillis" value="300000" />
+		<property name="testWhileIdle" value="true" />
+		<property name="testOnBorrow" value="false" />
+		<property name="testOnReturn" value="false" />
+		<property name="poolPreparedStatements" value="true" />
+		<property name="maxOpenPreparedStatements" value="20" />
+```
+
+```java
+    /**
+     * @author Aloha
+     * @date 2022/12/21 16:12
+     * @description 将配置属性与对象绑定
+     */
+    @ConfigurationProperties("spring.datasource")
+    @Bean
+    public DataSource dataSource() throws SQLException {
+        DruidDataSource druidDataSource = new DruidDataSource();
+        String url = druidDataSource.getUrl();
+        String userName = druidDataSource.getUsername();
+        //加入防火墙，监控功能
+        druidDataSource.setFilters("wall,stat");
+        return druidDataSource;
+    }
+        
+    /**
+     * @author Aloha
+     * @date 2022/12/19 1:05
+     * @description 使用Servlet 注册的方式 配置druid 的监控功能
+     */
+    @Bean
+    public ServletRegistrationBean starServlet(){
+        StatViewServlet statViewServlet = new StatViewServlet();
+        ServletRegistrationBean<StatViewServlet> servletRegistrationBean = new ServletRegistrationBean(statViewServlet, "/druid/*");
+        //配置登录账号
+        servletRegistrationBean.addInitParameter("loginUsername", "druid");
+        servletRegistrationBean.addInitParameter("loginPassword", "123456");
+        return servletRegistrationBean;
+    }
+
+    /**
+     * @author Aloha
+     * @date 2022/12/19 1:05
+     * @description 使用Servlet 注册的方式 配置druid 的监控功能, WebStatFilter 用于采集web-jdbc 关联监控的功能
+     */
+    @Bean
+    public FilterRegistrationBean webStatFilter(){
+        WebStatFilter webStatFilter = new WebStatFilter();
+        FilterRegistrationBean<WebStatFilter> filterRegistrationBean = new FilterRegistrationBean(webStatFilter);
+        filterRegistrationBean.setUrlPatterns(Arrays.asList("/*"));
+        filterRegistrationBean.addInitParameter("exclusions", "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*");
+        return filterRegistrationBean;
+    }
+    
+```
+
+### 11.2.2.2 StatViewServlet
+StatViewServlet的用途包括：
+* 提供监控信息展示的html页面
+* 提供监控信息的JSON API
+
+
+## 11.2.3 使用官方starter方式
+```xml
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>druid-spring-boot-starter</artifactId>
+    <version>1.1.17</version>
+</dependency>
+```
+
+### 11.2.3.1 分析自动配置
+* 扩展配置项 spring.datasource.druid
+* DruidSpringAopConfiguration.class, 监控SpringBean的；配置项: spring.datasource.druid.aop-patterns
+* DruidStatViewServletConfiguration.class, `img71` 监控页的配置：spring.datasource.druid.stat-view-servlet; 默认开启
+* DruidWebStatFilterConfiguration.class, web监控配置: spring.datasource.druid.web-stat-filter; 默认开启
+* DruidFilterConfiguration.class 所有Druid自己filter的配置(防火墙/监控功能等) `img72`
+
+![img_71.png](assets/img_71.png)
+![img_72.png](assets/img_72.png)
+
+### 11.2.3.1 配置示例
+```xml
+#Druid配置
+#开启StatViewServlet配置(整体的监控功能/监控页)
+spring.datasource.druid.stat-view-servlet.enabled=true
+#spring.datasource.druid.stat-view-servlet.url-pattern=/dddd/*
+spring.datasource.druid.stat-view-servlet.login-username=druid
+spring.datasource.druid.stat-view-servlet.login-password=123456
+
+#开启内置filters
+spring.datasource.druid.filters=stat,wall
+
+#配置Spring Aop 监控
+spring.datasource.druid.aop-patterns=com.example.running.*
+
+#开启WebStatFilter配置(Web监控)
+spring.datasource.druid.web-stat-filter.enabled=true
+spring.datasource.druid.web-stat-filter.url-pattern=/*
+spring.datasource.druid.web-stat-filter.exclusions=*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*
+
+# Druid filter配置
+# 个性化配置StatFilter
+spring.datasource.druid.filter.stat.enabled=true
+spring.datasource.druid.filter.stat.db-type=h2
+spring.datasource.druid.filter.stat.log-slow-sql=true
+spring.datasource.druid.filter.stat.slow-sql-millis=2000
+
+# 个性化配置WallFilter
+spring.datasource.druid.filter.wall.enabled=true
+spring.datasource.druid.filter.wall.db-type=h2
+spring.datasource.druid.filter.wall.config.delete-allow=false
+spring.datasource.druid.filter.wall.config.drop-table-allow=false
+```
+
+# 12 整合MyBatis操作
+> https://github.com/mybatis
+
+* SpringBoot官方的Starter: spring-boot-starter-*
+* 第三方的: *-spring-boot-starter
+
+```xml
+<dependency>
+    <groupId>org.mybatis.spring.boot</groupId>
+    <artifactId>mybatis-spring-boot-starter</artifactId>
+    <version>2.1.4</version>
+</dependency>
+```
+![img_73.png](assets/img_73.png)
+![img_74.png](assets/img_74.png)
+
+## 12.1 配置模式
+* 全局配置文件 `MybatisAutoConfiguration` `MybatisProperties`
+* SqlSessionFactory: 自动配置了
+* SqlSession: 自动配置了 `SqlSessionTemplate` 组合了`SqlSession`
+* `MapperScannerRegistrarNotFoundConfiguration` @Import(AutoConfiguredMapperScannerRegistrar.class）
+  * @Mapper:`AutoConfiguredMapperScannerRegistrar` 自动扫描标注了 @Mapper 注解的接口
+
+```java
+@EnableConfigurationProperties(MybatisProperties.class) //MyBatis配置项绑定类
+@AutoConfigureAfter({ DataSourceAutoConfiguration.class, MybatisLanguageDriverAutoConfiguration.class })
+public class MybatisAutoConfiguration{}
+
+@ConfigurationProperties(prefix = "mybatis")
+public class MybatisProperties{}
+```
+
+```xml
+# mybatis配置  全局配置/mapper映射
+# 指定全局配置文件路径
+# mybatis.config-location=classpath:mybatis/mybatis-config.xml
+mybatis.mapper-locations=classpath:mybatis/mapper/*.xml
+
+# mybatis 个性化配置 (也可在 mybatis-config.xml 中配置), 与mybatis.config-location 配置冲突, 只能存在一个配置
+# 是否开启驼峰命名自动映射
+mybatis.configuration.map-underscore-to-camel-case=true
+```
+
+```java
+//Sql Mapper 文件
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.running.service.mapper.CarBusniessMapper">
+
+    <!--    List<Business> selectAll; -->
+
+    <select id="selectAll" resultType="com.example.running.bean.Business">
+        select * from car_busniess where id=#{id}
+    </select>
+</mapper>
+
+//Mapper 映射
+@Mapper
+public interface CarBusniessMapper {
+    List<Business> selectAll(Long id);
+}
+
+@Service
+public class CurdService {
+
+    @Autowired
+    CarBusniessMapper carBusniessMapper;
+
+    //供外部调用，如controller
+    public List<Business> selectCarBusiness(Long id){
+        return carBusniessMapper.selectAll(id);
+    }
+}
+```
+
+* 导入mybatis官方starter
+* 编写mapper接口, 标注`@Mapper`注解
+* 编写sql映射文件并绑定mapper接口
+* 在 `application.properties` 中指定Mapper配置文件的位置, 指定 mapper映射文件路径, 并且也可个性化配置mybatis 相关操作
+### 12.1.1 整合第三方技术的两种方式
+
+
+## 12.1 整合第三方技术的两种方式
+
+### 12.1.1 整合第三方技术的两种方式
+
+
+## 12.1 整合第三方技术的两种方式
+
+### 12.1.1 整合第三方技术的两种方式
 
 
 
-## 9.3 异常处理自动配置原理
+# 答疑
 
+## 1.1 @ConfigurationProperties
+![img_70.png](assets/img_70.png)
+> 用于外部化配置的注释，如果您想绑定和验证一些外部属性(例如，从. Properties文件中)，可以将此添加到类定义或@Configuration类中的@Bean方法中。
+
+* JavaBean要映射的属性需要有public的setter方法 比如: @Data
+* JavaBean需要交给容器管理 比如：@Component
+* JavaBean中静态成员变量的不支持映射/绑定
+
+```java
+//绑定到类上
+@ConfigurationProperties(prefix = "spring.datasource.hikari")
+static class Hikari {
+
+    //绑定到 @Bean方法上
+    @Bean
+    @ConfigurationProperties(prefix = "spring.datasource.hikari")
+    HikariDataSource dataSource(DataSourceProperties properties) {
+        HikariDataSource dataSource = createDataSource(properties, HikariDataSource.class);
+        if (StringUtils.hasText(properties.getName())) {
+            dataSource.setPoolName(properties.getName());
+        }
+        return dataSource;
+    }
+
+}
+```
 
 
 

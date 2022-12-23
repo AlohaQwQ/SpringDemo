@@ -33,7 +33,7 @@ public class LoginInterceptor implements HandlerInterceptor {
         //登录逻辑检查
         HttpSession session = request.getSession();
         Object loginUser = session.getAttribute("loginUser");
-        if(loginUser==null){
+        /*if(loginUser==null){
             //登录拦截
             //session.setAttribute("msg","登录过期");
             //重定向到首页
@@ -44,7 +44,7 @@ public class LoginInterceptor implements HandlerInterceptor {
             request.getRequestDispatcher("/").forward(request, response);
 
             return false;
-        }
+        }*/
         return HandlerInterceptor.super.preHandle(request, response, handler);
     }
 

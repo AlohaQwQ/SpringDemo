@@ -1,19 +1,19 @@
 package com.example.running.service;
 
 import com.example.running.bean.Business;
+import com.example.running.bean.City;
+import com.example.running.bean.User;
 import com.example.running.service.mapper.CarBusniessMapper;
+import com.example.running.service.mapper.CityMapper;
+import com.example.running.service.mapper.UserMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
-import javax.sql.DataSource;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author hongyuan
@@ -28,8 +28,27 @@ public class CurdService {
     @Autowired
     CarBusniessMapper carBusniessMapper;
 
+    @Autowired
+    CityMapper cityMapper;
+
+    @Resource
+    UserMapper userMapper;
+
+
     public List<Business> selectCarBusiness(Long id){
         return carBusniessMapper.selectAll(id);
+    }
+
+    public City getCityById(Long id){
+        return cityMapper.getCityById(id);
+    }
+
+    public void insertCity(City city){
+        cityMapper.insertCity(city);
+    }
+
+    public List<User> selectUser(){
+        return userMapper.selectList(null);
     }
 
 }

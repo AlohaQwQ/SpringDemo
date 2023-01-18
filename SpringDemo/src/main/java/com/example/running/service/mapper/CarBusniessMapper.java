@@ -6,8 +6,7 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
-@Mapper
+//@Mapper
 public interface CarBusniessMapper {
-
     List<Business> selectAll(@Param("id") Long id);
 }

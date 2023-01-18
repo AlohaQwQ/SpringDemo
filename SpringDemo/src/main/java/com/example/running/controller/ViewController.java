@@ -1,17 +1,18 @@
 package com.example.running.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.running.annotations.User;
 import com.example.running.exception.UserTooManyException;
+import com.example.running.service.UserService;
 import com.sun.org.apache.xpath.internal.operations.Mod;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.View;
 import org.springframework.web.servlet.ViewResolver;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
@@ -106,9 +107,12 @@ public class ViewController {
         return "table/basic_table";
     }
 
+    @Autowired
+    UserService userService;
+
     @GetMapping("/dynamic_table")
-    public String dynamicTable(Model model){
-        List userList = Arrays.asList(new User("user1", "111"),
+    public String dynamicTable(@RequestParam(value = "pn", defaultValue = "1")Integer pageNum, Model model){
+        /*List userList = Arrays.asList(new User("user1", "111"),
                 new User("user2", "222"),
                 new User("user3", "333"),
                 new User("user4", "444"));
@@ -116,9 +120,39 @@ public class ViewController {
 
         if(userList.size()>3){
             throw new UserTooManyException("炸了");
-        }
+        }*/
+
+        //从数据库中查询数据返回
+        //List<com.example.running.bean.User> userList = userService.list();
+        //model.addAttribute("users", userList);
+
+        //分页查询数据 需配置 MybatisPlusInterceptor 插件
+        Page<com.example.running.bean.User> page = new Page<>(pageNum, 2);
+        //数据返回
+        Page<com.example.running.bean.User> returnPage = userService.page(page);
+        List<com.example.running.bean.User> userList = returnPage.getRecords();
+
+        //model.addAttribute("users", userList);
+
+        long current = returnPage.getCurrent();
+        long pages = returnPage.getPages();
+        long total = returnPage.getTotal();
+
+        model.addAttribute("users", returnPage);
 
         return "table/dynamic_table";
+    }
+
+    @GetMapping("/user/delete/{id}")
+    public String dynamicDeleteUser(@PathVariable Long id, @RequestParam(value = "pn", defaultValue = "1") Integer pageNum, RedirectAttributes redirectAttributes){
+        //使用mybatisplus
+        com.example.running.bean.User user = userService.getById(id);
+        boolean result = userService.removeById(user);
+
+        //携带重定向 当前页数据
+        redirectAttributes.addAttribute("pn", pageNum);
+        //删除完成重定向回原列表
+        return "redirect:/dynamic_table";
     }
 
     @GetMapping("/editable_table")

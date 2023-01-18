@@ -4208,7 +4208,7 @@ mybatis.configuration.map-underscore-to-camel-case=true
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.running.service.mapper.CarBusniessMapper">
 
-    <!--    List<Business> selectAll; -->
+    <!--    List<Business> selectAll(); -->
 
     <select id="selectAll" resultType="com.example.running.bean.Business">
         select * from car_busniess where id=#{id}
@@ -4238,17 +4238,332 @@ public class CurdService {
 * 编写mapper接口, 标注`@Mapper`注解
 * 编写sql映射文件并绑定mapper接口
 * 在 `application.properties` 中指定Mapper配置文件的位置, 指定 mapper映射文件路径, 并且也可个性化配置mybatis 相关操作
-### 12.1.1 整合第三方技术的两种方式
+
+## 12.2 注解模式
+```java
+@Mapper
+public interface CityMapper {
+
+    @Select("select * from city where id=#{id}")
+    City getCityById(@Param("id") Long id);
+
+    // useGeneratedKeys = true, keyProperty = "id"  使用自增主键，值为id
+    /*@Insert("INSERT INTO city (name, state, country) VALUES(#{name}, #{state}, #{country})")
+    @Options(useGeneratedKeys = true, keyProperty = "id")*/
+    void insertCity(City city);
+
+    @Select("select * from city")
+    List<City> getAll();
+}
+```
+
+## 12.3 混合模式
+```xml
+
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.running.service.mapper.CityMapper">
+    <!--    void insertCity(City city); -->
+    <insert id="insertCity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO city (name, state, country) VALUES(#{name}, #{state}, #{country})
+    </insert>
+
+</mapper>
+```
+> 最佳实战
+* 引入mybatis-starter
+* 配置application.properties中，指定mapper-location路径
+* 编写Mapper接口并标注@Mapper注解
+* 简单方法直接注解方式
+* 复杂方法编写mapper.xml进行绑定映射
+* `@MapperScan("com.example.running.service.mapper")` MainApplication 增加Mapper文件扫描路径，Mapper接口就可以不用标注@Mapper注解 
 
 
-## 12.1 整合第三方技术的两种方式
 
-### 12.1.1 整合第三方技术的两种方式
+## 12.4 整合 MyBatis-Plus 完成CRUD
+> https://baomidou.com/
+> 
+> 建议安装 MybatisX 插件 https://baomidou.com/pages/ba5b24/
+
+![img_75.png](assets/img_75.png)
+
+### 12.4.1 自动配置
+* `MybatisPlusAutoConfiguration` 配置类，`MybatisPlusProperties` 配置项绑定 
+  * mybatis-plus.xxx 对mybatis-plus进行配置
+* `SqlSessionFactory` 已自动配置, 底层将自动导入容器中默认的数据源`DataSource`
+* `mapperLocations` 已自动配置, 默认值:`classpath*:/mapper/**/*.xml`
+  * 任意包的类路径下的所有mapper文件夹下任意路径下的所有xml都是sql映射文件,  建议sql mapper映射文件，放在 resources/mapper下
+* 自动配置了 `SqlSessionTemplate`
+* `AutoConfiguredMapperScannerRegistrar` 注册自动扫描组件
+  * `@Mapper` 标注的方法将被自动扫描, 建议直接 `@MapperScan`批量扫描就行
+
+```java
+/**
+ * User 表接口, 继承 mybatisplus 数据库查询通用Service
+ */
+public interface UserService extends IService<User> {}
+
+@Service("UserService")
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {}
+
+@Controller
+public class CurdController {
+
+    @Autowired
+    UserService userService;
+
+    @ResponseBody
+    @PostMapping("/selectUser")
+    public List<User> selectUser(){
+        //使用mybatisplus 查询数据库
+        List<User> userList = userService.list();
+        return userList;
+    }
+
+    @ResponseBody
+    @PostMapping("/deleteUser")
+    public String deleteUser(@RequestParam String userId){
+        //使用mybatisplus
+        boolean result = userService.removeById(userId);
+        logger.info("deleteUser:{}", result);
+        return "success";
+    }
+
+    @GetMapping("/dynamic_table")
+    public String dynamicTable(@RequestParam(value = "pn", defaultValue = "1")Integer pageNum, Model model){
+        //分页查询数据 需配置 MybatisPlusInterceptor 插件
+        Page<com.example.running.bean.User> page = new Page<>(pageNum, 2);
+        //数据返回
+        Page<com.example.running.bean.User> returnPage = userService.page(page);
+        List<com.example.running.bean.User> userList = returnPage.getRecords();
+
+        //model.addAttribute("users", userList);
+        long current = returnPage.getCurrent();
+        long pages = returnPage.getPages();
+        long total = returnPage.getTotal();
+
+        model.addAttribute("users", returnPage);
+        return "table/dynamic_table";
+    }
+
+    @GetMapping("/user/delete/{id}")
+    public String dynamicDeleteUser(@PathVariable Long id, @RequestParam(value = "pn", defaultValue = "1") Integer pageNum, RedirectAttributes redirectAttributes){
+        //使用mybatisplus
+        boolean result = userService.removeById(id);
+        //携带重定向 当前页数据
+        redirectAttributes.addAttribute("pn", pageNum);
+        //删除完成重定向回原列表
+        return "redirect:/dynamic_table";
+    }
+    
+}
+```
+
+## 12.5 NoSQL-Redis
+> https://www.redis.net.cn
+> 
+> https://redis.io/docs/stack/get-started
+
+![img_76.png](assets/img_76.png)
 
 
-## 12.1 整合第三方技术的两种方式
+### 12.5.1 Redis自动配置
+![img_77.png](assets/img_77.png)
 
-### 12.1.1 整合第三方技术的两种方式
+* `RedisAutoConfiguration` 自动配置类 `RedisProperties` `spring.redis.xxx`是对redis的配置类
+* `LettuceConnectionConfiguration` `JedisConnectionConfiguration` 自动注入连接工厂
+* 自动注入了Redis模板引擎`RedisTemplate<Object, Object>` (xxxTemplate)
+* 自动注入了`StringRedisTemplate` key:value都是String
+* 底层使用 `StringRedisTemplate` `RedisTemplate` 来操作redis
+
+### 12.5.2 RedisTemplate与Lettuce
+
+```java
+void testRedis() {
+    //k-v形式存储数据
+    ValueOperations<String, String> valueOperations = stringRedisTemplate.opsForValue();
+    valueOperations.set("redisTest1", "11");
+    valueOperations.set("redisTest2", "22");
+    String redisTest1 = valueOperations.get("redisTest1");
+}
+```
+
+
+# 13 单元测试JUnit
+![img_78.png](assets/img_78.png)
+
+## 13.1 配置
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-test</artifactId>
+    <scope>test</scope>
+</dependency>
+```
+
+> SpringBoot整合Junit
+* 编写测试方法 `@Test`标注
+* Junit类具有Spring的功能, 可使用`@Autowired`引入容器组件
+* 比如 `@Transactional` 标注测试方法，测试完成后自动回滚
+
+## 13.2 JUnit5常用注解
+JUnit5的注解与JUnit4的注解有所变化
+> https://junit.org/junit5/docs/current/user-guide/#writing-tests-annotations
+* @Test: 表示方法是测试方法。但是与JUnit4的@Test不同，他的职责非常单一不能声明任何属性，拓展的测试将会由Jupiter提供额外测试
+* @ParameterizedTest: 表示方法是参数化测试，下方会有详细介绍
+* @RepeatedTest: 表示方法可重复执行，下方会有详细介绍
+* @DisplayName: 为测试类或者测试方法设置展示名称
+* @BeforeEach: 表示在每个单元测试之前执行
+* @AfterEach: 表示在每个单元测试之后执行
+* @BeforeAll: 表示在所有单元测试之前执行
+* @AfterAll: 表示在所有单元测试之后执行
+* @Tag: 表示单元测试类别，类似于JUnit4中的@Categories
+* @Disabled: 表示测试类或测试方法不执行，类似于JUnit4中的@Ignore
+* @Timeout: 表示测试方法运行如果超过了指定时间将会返回错误
+* @ExtendWith: 为测试类或测试方法提供扩展类引用
+  * @SpringBootTest 可参考该注解, 本质上是用了 @ExtendWith
+    * @BootstrapWith(SpringBootTestContextBootstrapper.class)
+    * @ExtendWith(SpringExtension.class)
+
+
+## 13.3 断言(assertions)
+> 断言（assertions）是测试方法中的核心部分，用来对测试需要满足的条件进行验证
+这些断言方法都是 org.junit.jupiter.api.Assertions 的静态方法
+JUnit 5 内置的断言可以分成如下几个类别:
+检查业务逻辑返回的数据是否合理
+所有的测试运行结束以后，会有一个详细的测试报告
+
+### 13.3.1 简单断言
+* assertEquals: 判断两个对象或两个原始类型是否相等
+* assertNotEquals: 判断两个对象或两个原始类型是否不相等
+* assertSame: 判断两个对象引用是否指向同—个对象
+* assertNotSame: 判断两个对象引用是否指向不同的对象
+* assertTrue: 判断给定的布尔值是否为true
+* assertFalse: 判断给定的布尔值是否为false
+* assertNull: 判断给定的对象引用是否为null
+* assertNotNull: 判断给定的对象引用是否不为null
+
+```java
+    @Test
+    void testAssertEquals(){
+        int result = add(3,3);
+        Assertions.assertEquals(4, result, "终于错了");
+        logger.info("testAssertEquals:{}", result);
+    }
+
+    int add(int a, int b){
+        return a+b;
+    }
+
+    /**
+     * 断言所有逻辑
+     */
+    @Test
+    void assertAll(){
+        Assertions.assertAll("AssertAll Error",
+                () -> Assertions.assertTrue(true),
+                () -> Assertions.assertEquals("heihei1", "heihei", "不相同！"));
+        logger.info("assertAll:{}", "assertAll");
+
+    }
+
+    /**
+     * 异常断言
+     */
+    @Test
+    void assertThrows(){
+        Assertions.assertThrows(Throwable.class,
+                () -> Assertions.assertTrue(false), "居然正常");
+        logger.info("assertThrows:{}", "assertThrows");
+    }
+
+
+    //重复执行测试方法
+    @RepeatedTest(10)
+    void testRepeatedTest() {
+        logger.info("test:{}", "testRepeatedTest");
+    }
+
+    @BeforeEach
+    void testBeforeEach() {
+        logger.info("test:{}", "testBeforeEach");
+    }
+
+    @BeforeAll
+    static void testBeforeAll() {
+        logger.info("test:{}", "testBeforeAll");
+    }
+
+    @AfterEach
+    void testAfterEach() {
+        logger.info("test:{}", "testAfterEach");
+    }
+
+    @AfterAll
+    static void testAfterAll() {
+        logger.info("test:{}", "testAfterAll");
+    }
+```
+
+### 13.3.2 前置条件(Assertions)
+> JUnit 5 中的前置条件（Assertions[假设]）类似于断言，不同之处在于不满足的断言会使得测试方法失败，
+而不满足的前置条件只会使得测试方法的执行终止。前置条件可以看成是测试方法执行的前提，当该前提不满足时，就没有继续执行的必要。
+```java
+    @Test
+    void testAssumptions(){
+        Assumptions.assumeTrue(false);
+    }
+```
+
+### 13.3.3 嵌套测试
+> JUnit5可以通过Java中的内部类和@Nested 注解实现嵌套测试，从而可以更好的把相关的测试方法组织在一起。
+在内部类中可以使用@BeforeEach 和@AfterEach 注解，而且嵌套的层次没有限制。
+
+
+### 13.3.4 参数化测试
+> 参数化测试是JUnit5很重要的一个新特性，它使得用不同的参数多次运行测试成为了可能，也为我们的单元测试带来许多便利。
+利用@ValueSource等注解，指定入参，我们将可以使用不同的参数进行多次单元测试，而不需要每新增一个参数就新增一个单元测试，省去了很多冗余代码。
+
+* @ValueSource: 为参数化测试指定入参来源, 支持八大基础类以及String类型,Class类型
+* @NullSource: 表示为参数化测试提供一个null的入参
+* @EnumSource: 表示为参数化测试提供一个枚举入参
+* @CsvFileSource: 表示读取指定CSV文件内容作为参数化测试入参
+* @MethodSource: 表示读取指定方法的返回值作为参数化测试入参(注意方法返回需要是一个流)
+
+```java
+    @ParameterizedTest
+    @DisplayName("参数化测试")
+    @ValueSource(strings = { "racecar", "radar", "able was I ere I saw elba" })
+    @NullSource
+    void parameterizedTest(String candidate) {
+        assertTrue(true);
+    }
+            
+    @ParameterizedTest
+    @MethodSource("stringProvider")
+    void testWithExplicitLocalMethodSource(String argument) {
+        assertNotNull(argument);
+    }
+
+    static Stream<String> stringProvider() {
+        return Stream.of("apple", "banana");
+    }
+```
+
+> 当然如果参数化测试仅仅只能做到指定普通的入参还达不到让我觉得惊艳的地步。让我真正感到他的强大之处的地方在于他可以支持外部的各类入参。
+如:CSV,YML,JSON 文件甚至方法的返回值也可以作为入参。只需要去实现ArgumentsProvider接口，任何外部文件都可以作为它的入参。
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4282,7 +4597,36 @@ static class Hikari {
 ```
 
 
+## 1.2 @Autowired自动注入
+` @Autowired @Resource 二者依赖注入的区别`
+* 来源不同: @Autowired 来自 Spring 框架，而 @Resource 来自于（Java）JSR-250；
+* 依赖查找的顺序不同: @Autowired 先根据类型再根据名称查询，而 @Resource 先根据名称再根据类型查询
+  * https://www.jb51.net/article/260980.htm
+  * `@Resource` 注解源码可以在 Spring 源码的 org.springframework.context.annotation.CommonAnnotationBeanPostProcessor#postProcessPropertyValues 中分析得出。虽然 @Resource 是 JSR-250 定义的，但是由 Spring 提供了具体实现
+* 支持的参数不同: @Autowired 只支持设置 1 个参数，而 @Resource 支持设置 7 个参数；
+* 依赖注入的用法支持不同: @Autowired 既支持构造方法注入，又支持属性注入和 Setter 注入，而 @Resource 只支持属性注入和 Setter 注入；
+* 编译器 IDEA 的提示不同: 当注入 Mapper 对象时，使用 @Autowired 注解编译器会提示错误，而使用 @Resource 注解则不会提示错误。
 
+```java
+class MainApplicationTests {
+    
+    //成员变量注入
+    @Autowired //@Resource
+    DataSource dataSource;
+
+    //构造方法注入
+    @Autowired
+    public MainApplicationTests(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+
+    //方法参数注入
+    @Autowired //@Resource
+    public void setService(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+}
+```
 
 
 

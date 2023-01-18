@@ -5,6 +5,7 @@ import com.example.running.bean.Cat;
 import com.example.running.bean.Dog;
 import com.example.running.bean.Zhouzhou;
 import com.example.running.config.RunningConfig;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -150,6 +151,7 @@ import java.lang.reflect.Field;
 //scanBasePackages-修改包扫描路径
 @ServletComponentScan()
 @SpringBootApplication()
+@MapperScan("com.example.running.service.mapper") //标注mapper 文件扫描路径
 //@SpringBootConfiguration(proxyBeanMethods = false)
 public class MainApplication {
 

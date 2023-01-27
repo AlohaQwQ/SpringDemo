@@ -3,8 +3,11 @@ package com.example.running.controller;
 import com.example.running.annotations.Person;
 import com.example.running.bean.Dog;
 import com.example.running.bean.Zhouzhou;
+import com.stat.auto.service.AutoService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.HttpServletBean;
@@ -24,6 +27,7 @@ import java.util.Map;
  * @date 2022/7/24 17:55
  * @description 控制器
  */
+//@Profile("test")
 @RestController
 public class RunningController {
 
@@ -33,6 +37,12 @@ public class RunningController {
     @Autowired
     private Dog dog;
 
+    @Value("${mydog.name}")
+    String dogName;
+
+    @Autowired
+    AutoService autoService;
+
     @RequestMapping("/dog")
     public Dog dog(){
         return dog;
@@ -40,9 +50,10 @@ public class RunningController {
 
     @RequestMapping("/hello")
     public String hello(@RequestParam String hello){
-        zhouzhou.getCat();
+        /*zhouzhou.getCat();
         String name = zhouzhou.getName();
-        return "hello:" + hello;
+        return "hello:" + dogName + "-" + hello;*/
+        return autoService.helloService(hello);
     }
 
     @RequestMapping("/helloSession")

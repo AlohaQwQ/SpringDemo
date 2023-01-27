@@ -1,5 +1,5 @@
 [TOC]
-
+![img_0.png](assets/img_0.png)
 # 1.SpringBoot概览
 
 ## 1.1 Spring 的能力
@@ -4557,14 +4557,219 @@ JUnit 5 内置的断言可以分成如下几个类别:
 
 
 
+# 14 指标监控
+## 14.1 SpringBoot Actuator
+> https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html
+![img_79.png](assets/img_79.png)
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
+
+### 14.1.1 使用
+> Actuator 可通过HTTP和JMX的公开端口来访问
+```xml
+# 通过 HTTP 公开除env和beans端点之外的所有内容
+management.endpoints.web.exposure.include=*
+management.endpoints.web.exposure.exclude=env,beans
+```
+> JMX访问: 命令jconsole
+![img_82.png](assets/img_82.png)
+
+* Http访问 http://localhost:8080/actuator/**
+* 暴露所有监控信息为HTTP
+
+> 可视化 https://github.com/codecentric/spring-boot-admin
+
+## 14.2 Actuator Endpoint
+> 最常使用的端点(见img79)
+
+> http://localhost:8088/actuator/beans
+> 
+> http://localhost:8088/actuator/configprops
+> 
+> http://localhost:8088/actuator/metrics
+> 
+> http://localhost:8088/actuator/metrics/jvm.gc.pause
+
+* Health：监控状况
+* Metrics：运行时指标
+* Loggers：日志记录
+
+### 14.2.1 Health Endpoint
+> 健康检查端点，我们一般用于在云平台，平台会定时的检查应用的健康状况，我们就需要Health Endpoint可以为平台返回当前应用的一系列组件健康状况的集合。
+重要的几点
+* health endpoint返回的结果，应该是一系列健康检查后的一个汇总报告
+* 很多的健康检查默认已经自动配置好了，比如：数据库、redis等
+* 可以很容易的添加自定义的健康检查机制
+![img_80.png](assets/img_80.png)
+
+### 14.2.2 Metrics Endpoint
+> 提供详细的、层级的、空间指标信息，这些信息可以被pull（主动推送）或者push（被动获取）方式得到；
+
+* 通过Metrics对接多种监控系统
+* 简化核心Metrics开发
+* 添加自定义Metrics或者扩展已有Metrics
+![img_81.png](assets/img_81.png)
+
+# 15 原理解析
+
+## 15.1 Profile
+> 为了方便多环境适配，springboot简化了profile功能
+
+* 默认配置文件  application.yaml 任何时候都会加载
+* 指定环境配置文件 application-{env}.yaml(`application-prod.properties/application-test.properties`)
+* 激活指定环境
+  * 配置文件激活: spring.profiles.active=prod
+  * 使用命令行修改配置项: java -jar xxx.jar --spring.profiles.active=prod  --person.name=haha
+    * 修改配置文件的任意值，命令行最高优先级
+* 默认配置与环境配置同时生效
+* 同名配置项，profile配置优先
+
+### 15.1.1 @Profile条件装配功能
+```java
+@Configuration(proxyBeanMethods = false)
+@Profile("production")
+public class ProductionConfiguration {
+
+    // ...
+
+}
+```
+### 15.1.2 profile分组
+spring.profiles.group.production[0]=proddb
+spring.profiles.group.production[1]=prodmq
+使用: --spring.profiles.active=production  激活
+
+![img_83.png](assets/img_83.png)
 
 
+## 15.2 外部化配置
+![img_84.png](assets/img_84.png)
+
+### 15.2.1  外部配置源
+> 常用: Java属性文件、YAML文件、环境变量、命令行参数
+
+`指定环境优先，外部优先，后面的可以覆盖前面的同名配置项`
+
+### 15.2.2 配置文件查找位置
+* classpath 根路径
+* classpath 根路径下config目录
+* jar包当前目录
+* jar包当前目录的config目录
+* /config子目录的直接子目录
+
+![img_85.png](assets/img_85.png)
+![img_87.png](assets/img_87.png)
+
+### 15.2.3 配置文件加载顺序(优先级从低到高)
+* 当前jar包内部的application.properties和application.yml
+* 当前jar包内部的application-{profile}.properties 和 application-{profile}.yml
+* 引用的外部jar包的application.properties和application.yml
+* 引用的外部jar包的application-{profile}.properties 和 application-{profile}.yml
+* 指定环境优先，外部优先，后面的可以覆盖前面的同名配置项
 
 
+# 16 自定义starter
+## 16.1 starter启动原理
+> starter-pom引入 autoconfigurer 包
+
+![img_86.png](assets/img_86.png)
+
+* autoconfigure包中配置使用 `META-INF/spring.factories` 中 `EnableAutoConfiguration` 的值，使得项目启动加载指定的自动配置类
+* 编写自动配置类 xxxAutoConfiguration -> xxxxProperties
+  * @Configuration
+  * @Conditional
+  * @EnableConfigurationProperties
+  * @Bean
+  * ......
+> 引入starter --- xxxAutoConfiguration --- 容器中放入组件 ---- 绑定xxxProperties ---- 配置项
+
+## 16.2 自定义starter
+* atguigu-hello-spring-boot-starter(启动器)
+* atguigu-hello-spring-boot-starter-autoconfigure(自动配置包)
+* maven 打包到本地仓库(install)
+
+![img_88.png](assets/img_88.png)
+![img_89.png](assets/img_89.png)
+![img_90.png](assets/img_90.png)
+![img_91.png](assets/img_91.png)
+
+# 17 SpringBoot原理
+> Spring原理`Spring注解`、SpringMVC原理、自动配置原理、SpringBoot原理
+
+## 17.1 Application Events and Listeners
+> 涉及到的系统组件包含如下
+
+> https://docs.spring.io/spring-boot/docs/current/reference/html/spring-boot-features.html#boot-features-application-events-and-listeners
+
+* ApplicationContextInitializer(初始化器)
+* ApplicationListener(监听器)
+* SpringApplicationRunListener(运行监听器)
+
+## 17.2 SpringBoot启动过程
+* 创建 SpringApplication
+  * 保存一些信息 `img92`
+  * 判断当前应用的类型。ClassUtils->Servlet
+  * bootstrappers：初始启动引导器（List<Bootstrapper>）->去`spring.factories`文件中寻找类型 org.springframework.boot.Bootstrapper
+  * 找 ApplicationContextInitializer-> 去spring.factories找 ApplicationContextInitializer
+    * List<ApplicationContextInitializer<?>> initializers
+  * 找 ApplicationListener->应用监听器, 去`spring.factories`找 `ApplicationListener`
+    * List<ApplicationListener<?>> listeners
+* 运行 SpringApplication
+  * StopWatch
+  * 记录应用的启动时间
+  * 创建引导上下文（Context环境）`createBootstrapContext()`
+    * 获取到所有之前的 `bootstrappers` 挨个执行 `intitialize()` 来完成对引导启动器上下文环境设置
+  * 让当前应用进入headless模式。java.awt.headless
+  * 获取所有 `RunListener`（运行监听器）`为了方便所有Listener进行事件感知` `img94`
+    * getSpringFactoriesInstances 去spring.factories找 SpringApplicationRunListener.
+    * 遍历 `SpringApplicationRunListener` 调用 starting 方法；
+    * 相当于通知所有感兴趣系统正在启动过程的监听器，项目正在 starting。
+  * 保存命令行参数`ApplicationArguments`
+  * 准备环境 `prepareEnvironment（）`
+    * 返回或者创建Servlet基础环境信息对象 `StandardServletEnvironment`
+    * 配置环境信息对象 `configurePropertySources()`
+      * 读取所有的配置源的配置属性值 
+    * 绑定环境信息
+    * 监听器`RunListener`调用 `listener.environmentPrepared()` 通知所有的监听器当前环境准备完成
+  * 创建IOC容器 `createApplicationContext()`
+    * 根据项目类型(Servlet)创建容器，
+    * 当前会创建 `AnnotationConfigServletWebServerApplicationContext`
+    * 将系统启动信息保存到容器中 `setApplicationStartup()`
+  * 准备ApplicationContext IOC容器的基本信息 `prepareContext()`
+    * 保存环境信息
+    * IOC容器的后置处理流程。
+    * 应用初始化器操作 `applyInitializers`
+      * 遍历所有的 `ApplicationContextInitializer`, 调用 `initialize()` 来对ioc容器进行初始化扩展功能 `img95`
+      * 遍历所有的 `RunListener` 监听器调用 `contextPrepared()` (EventPublishRunListenr)
+    * 所有的监听器`RunListener` 监听器调用 `contextLoaded()`
+  * 刷新IOC容器 `refreshContext()` `img96`
+    * **调用Spring IOC 的 `refresh()` 进行Spring的初始化过程**
+    * 实例化容器中的所有组件
+  * 容器刷新完成后工作 `afterRefresh()`
+  * 所有监听器调用 `listeners.started(context)` (系统启动已完成)
+  * 调用所有 runners的`callRunners()`方法 (ApplicationRunner/CommandLineRunner) `img97`
+    * 获取容器中的 `ApplicationRunner`
+    * 获取容器中的 `CommandLineRunner`
+    * 合并所有`runner`并且按照`@Order`进行排序
+    * 遍历所有的`runner`, 调用 `run()` 方法
+  * 如果以上有异常
+    * 调用`RunListener` 的 `failed()`方法
+  * 调用所有监听器`RunListener`的 `running()` 方法, 通知所有的监听器 running
+  * `RunListener`的 `running()` 如果有问题, 继续通知 `failed()`, 调用所有 Listener 的 `failed()`
 
 
-
-
+![img_92.png](assets/img_92.png)
+![img_93.png](assets/img_93.png)
+![img_94.png](assets/img_94.png)
+![img_95.png](assets/img_95.png)
+![img_96.png](assets/img_96.png)
+![img_97.png](assets/img_97.png)
+![img_98.png](assets/img_98.png)
 
 
 # 答疑

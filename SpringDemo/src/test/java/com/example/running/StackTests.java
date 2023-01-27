@@ -21,7 +21,7 @@ class StackTests {
     static Logger logger = LoggerFactory.getLogger(StackTests.class);
 
     Stack<Object> stack;
-    
+
     /**
      * @author Aloha
      * @date 2023/1/18 22:01

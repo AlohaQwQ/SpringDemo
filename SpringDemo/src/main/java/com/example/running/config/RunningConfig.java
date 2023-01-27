@@ -262,10 +262,10 @@ public class RunningConfig {
             @Override
             public void addInterceptors(InterceptorRegistry registry) {
                 //添加拦截器并配置拦截路径，排除哪些路径  /** 表示拦截所有请求
-                registry.addInterceptor(new LoginInterceptor())
+                /*registry.addInterceptor(new LoginInterceptor())
                         .addPathPatterns("/**") //所有请求都被拦截，包括静态资源
                         .excludePathPatterns("/","/login","/css/**","/font/**","/images/**","/js/**"); //放行的请求
-                WebMvcConfigurer.super.addInterceptors(registry);
+                WebMvcConfigurer.super.addInterceptors(registry);*/
             }
         };
         return webMvcConfigurer;

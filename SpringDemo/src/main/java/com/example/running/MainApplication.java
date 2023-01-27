@@ -151,11 +151,13 @@ import java.lang.reflect.Field;
 //scanBasePackages-修改包扫描路径
 @ServletComponentScan()
 @SpringBootApplication()
+//@EnableAdminServer
 @MapperScan("com.example.running.service.mapper") //标注mapper 文件扫描路径
 //@SpringBootConfiguration(proxyBeanMethods = false)
 public class MainApplication {
 
     public static void main(String[] args) {
+        //args-若通过命令行启动则该参数会被传递
         //1.返回IOC 容器
         ConfigurableApplicationContext context =  SpringApplication.run(MainApplication.class, args);
 

@@ -11,6 +11,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.ServletComponentScan;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Conditional;
@@ -57,7 +58,7 @@ import java.lang.reflect.Field;
  *      @EnableAutoConfiguration 开启自动配置
  *       ——@AutoConfigurationPackage 自动配置包
  *          ——@Import(AutoConfigurationPackages.Registrar.class) Registrar给容器中 某个包下的组件批量注册（MainApplication）
- *         @Import(AutoConfigurationImportSelector.class)
+ *           @Import(AutoConfigurationImportSelector.class)
  *          1、利用getAutoConfigurationEntry(annotationMetadata);给容器中批量导入一些组件
  *          2、调用List<String> configurations = AutoConfigurationImportSelector.getCandidateConfigurations(annotationMetadata, attributes)获取到所有需要导入到容器中的配置类
  *          3、利用工厂加载 Map<String, List<String>> SpringFactoriesLoader.loadSpringFactories(@Nullable ClassLoader classLoader)；得到所有的组件
@@ -154,6 +155,7 @@ import java.lang.reflect.Field;
 //@EnableAdminServer
 @MapperScan("com.example.running.service.mapper") //标注mapper 文件扫描路径
 //@SpringBootConfiguration(proxyBeanMethods = false)
+@EnableFeignClients //开启OpenFeign 客户端
 public class MainApplication {
 
     public static void main(String[] args) {

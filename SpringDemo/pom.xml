@@ -14,6 +14,7 @@
         <maven.compiler.target>8</maven.compiler.target>
         <!-- 修改默认mysql 版本-->
         <!--<mysql.version>5.1.49</mysql.version>-->
+        <spring-cloud.version>2022.0.1</spring-cloud.version>
     </properties>
 
     <parent>
@@ -22,6 +23,18 @@
         <version>2.7.1</version>
     </parent>
 
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <!-- Additional lines to be added here... -->
     <!--Web开发场景依赖，集成Spring Mvc，Tomcat等所需组件，大多数依赖都由 spring-boot-autoconfigure 自动配置功能包已预先配置好了 -->
@@ -37,6 +50,18 @@
                 </exclusion>
             </exclusions>-->
         </dependency>
+
+        <!--<dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-config</artifactId>
+        </dependency>-->
+
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+
+
         <dependency>
             <groupId>org.webjars</groupId>
             <artifactId>jquery</artifactId>
@@ -98,7 +123,7 @@
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>druid-spring-boot-starter</artifactId>
-            <version>1.2.15</version>
+            <version>1.2.14</version>
         </dependency>
 
        <!-- <dependency>
@@ -150,11 +175,33 @@
             <version>3.0.0</version>
         </dependency>
 
+        <!--openfeign-->
         <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>5.8.16</version>
+        </dependency>
+
+        <!--<dependency>
             <groupId>com.star</groupId>
             <artifactId>hello-spring-boot-starter</artifactId>
             <version>1.0-SNAPSHOT</version>
-        </dependency>
+        </dependency>-->
+
         <!--可视化监控-->
         <!--<dependency>
             <groupId>de.codecentric</groupId>
@@ -203,11 +250,13 @@
         </dependency>-->
 
         <!--yaml 配置处理提示-->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
         </dependency>
+
     </dependencies>
 
 

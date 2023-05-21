@@ -3,7 +3,7 @@ package com.example.running.controller;
 import com.example.running.annotations.Person;
 import com.example.running.bean.Dog;
 import com.example.running.bean.Zhouzhou;
-import com.stat.auto.service.AutoService;
+//import com.stat.auto.service.AutoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
@@ -40,8 +40,8 @@ public class RunningController {
     @Value("${mydog.name}")
     String dogName;
 
-    @Autowired
-    AutoService autoService;
+//    @Autowired
+//    AutoService autoService;
 
     @RequestMapping("/dog")
     public Dog dog(){
@@ -50,10 +50,10 @@ public class RunningController {
 
     @RequestMapping("/hello")
     public String hello(@RequestParam String hello){
-        /*zhouzhou.getCat();
+        zhouzhou.getCat();
         String name = zhouzhou.getName();
-        return "hello:" + dogName + "-" + hello;*/
-        return autoService.helloService(hello);
+        return "hello:" + dogName + "-" + hello;
+        //return autoService.helloService(hello);
     }
 
     @RequestMapping("/helloSession")
